@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a1410" />
+    <meta name="description" content="Selbstgehostetes Casino mit Spielgeld – Poker, Blackjack, Slots, Roulette und Baccarat mit Freunden." />
+    <title>Casino</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="connection" class="connection" hidden>
+      <span class="connection-dot"></span><span id="connection-text">Verbinde …</span>
+    </div>
+
+    <!-- ------------------------------------------------------ Eingangshalle -->
+    <section class="screen screen--center" id="screen-entry">
+      <div class="hero">
+        <div class="hero-cards" id="hero-cards" aria-hidden="true"></div>
+        <h1 class="hero-title" id="entry-title">Casino</h1>
+        <p class="hero-subtitle">
+          Poker, Blackjack, Slots, Roulette und Baccarat – mit Freunden und Bots.
+        </p>
+        <p class="playmoney-badge">Reines Spielgeld · kein Echtgeld · keine Auszahlung</p>
+      </div>
+
+      <div class="panel">
+        <label class="field">
+          <span class="field-label">Dein Name</span>
+          <input
+            id="input-name"
+            class="input"
+            type="text"
+            maxlength="16"
+            autocomplete="nickname"
+            placeholder="z. B. Robin"
+            spellcheck="false"
+          />
+        </label>
+        <p class="field-note">
+          Mit demselben Namen bekommst du auch später wieder dein Guthaben.
+        </p>
+        <button id="btn-enter" class="button button--primary">Casino betreten</button>
+
+        <div class="divider"><span>oder direkt an einen Tisch</span></div>
+
+        <label class="field">
+          <span class="field-label">Tisch-Code</span>
+          <input
+            id="input-code"
+            class="input input--code"
+            type="text"
+            maxlength="4"
+            autocomplete="off"
+            autocapitalize="characters"
+            placeholder="ABCD"
+            spellcheck="false"
+          />
+        </label>
+        <button id="btn-enter-code" class="button">Beitreten</button>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------- Floor -->
+    <section class="screen screen--floor" id="screen-floor" hidden>
+      <header class="topbar">
+        <div class="topbar-group">
+          <h1 class="floor-title" id="floor-title">Casino</h1>
+        </div>
+        <div class="topbar-group">
+          <button class="wallet" id="wallet-chip" title="Dein Guthaben">
+            <span class="wallet-icon" aria-hidden="true"></span>
+            <span id="wallet-amount">0</span>
+          </button>
+          <button class="icon-button" id="btn-guests" title="Wer ist da?">Gäste</button>
+          <button class="icon-button" id="btn-host" title="Host-Bereich" hidden>Host</button>
+        </div>
+      </header>
+
+      <main class="floor" id="floor-list"></main>
+
+      <footer class="floor-foot">
+        <p class="fineprint">
+          Spielgeld ohne jeden Gegenwert. Chips lassen sich nicht kaufen und nicht auszahlen.
+        </p>
+      </footer>
+    </section>
+
+    <!-- ------------------------------------------------------------- Tisch -->
+    <section class="screen screen--table" id="screen-table" hidden>
+      <header class="topbar topbar--table">
+        <div class="topbar-group">
+          <button class="icon-button" id="btn-back">‹ Floor</button>
+          <span class="pill" id="table-title">Tisch</span>
+          <span class="pill pill--muted" id="table-code">––––</span>
+        </div>
+        <div class="topbar-group">
+          <button class="wallet wallet--small" id="table-wallet">
+            <span class="wallet-icon" aria-hidden="true"></span>
+            <span id="table-chips">0</span>
+          </button>
+          <button class="icon-button" id="btn-info" title="Spielinfo">?</button>
+          <button class="icon-button" id="btn-table-settings" title="Tisch einrichten">Tisch</button>
+        </div>
+      </header>
+
+      <div class="felt" id="felt">
+        <div class="felt-center" id="felt-center"></div>
+        <div class="seat-ring" id="seat-ring"></div>
+        <div class="deal-layer" id="deal-layer" aria-hidden="true"></div>
+      </div>
+
+      <div class="side-panel" id="side-panel" hidden></div>
+
+      <footer class="dock" id="dock">
+        <div class="dock-hand" id="dock-hand"></div>
+        <div class="dock-actions" id="dock-actions"></div>
+      </footer>
+    </section>
+
+    <!-- ---------------------------------------------------------- Dialoge -->
+    <div class="overlay" id="overlay-create" hidden>
+      <div class="sheet sheet--wide sheet--scroll">
+        <h2 class="sheet-title" id="create-title">Tisch eröffnen</h2>
+        <label class="field">
+          <span class="field-label">Name des Tisches</span>
+          <input id="create-name" class="input" type="text" maxlength="24" placeholder="Stammtisch" />
+        </label>
+        <div id="create-fields"></div>
+        <button class="button button--primary" id="btn-create-confirm">Tisch eröffnen</button>
+        <button class="button button--ghost" id="btn-create-cancel">Abbrechen</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="overlay-table-settings" hidden>
+      <div class="sheet sheet--wide sheet--scroll">
+        <h2 class="sheet-title">Tisch einrichten</h2>
+
+        <div class="settings-block">
+          <div class="settings-row">
+            <p class="eyebrow">Bots am Tisch</p>
+            <div class="stepper-group">
+              <button id="btn-bot-remove" class="stepper" type="button" aria-label="Bot entfernen">−</button>
+              <span class="stepper-value" id="bot-count">0</span>
+              <button id="btn-bot-add" class="stepper" type="button" aria-label="Bot hinzufügen">+</button>
+            </div>
+          </div>
+          <p class="settings-note">Bots füllen leere Plätze, wenn Freunde fehlen.</p>
+        </div>
+
+        <div class="settings-block">
+          <p class="eyebrow">Schwierigkeit der Bots</p>
+          <div class="segmented" id="difficulty-group">
+            <button class="segment" data-difficulty="easy" type="button">leicht</button>
+            <button class="segment" data-difficulty="medium" type="button">mittel</button>
+            <button class="segment" data-difficulty="hard" type="button">schwer</button>
+          </div>
+        </div>
+
+        <div class="settings-block">
+          <p class="eyebrow">Tisch teilen</p>
+          <button class="button button--ghost" id="btn-copy-code">Tisch-Code kopieren</button>
+        </div>
+
+        <button class="button button--danger" id="btn-close-table">Tisch schließen</button>
+        <button class="button" id="btn-settings-done">Fertig</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="overlay-host" hidden>
+      <div class="sheet sheet--wide sheet--scroll">
+        <h2 class="sheet-title">Host-Bereich</h2>
+        <p class="sheet-sub" id="host-status"></p>
+
+        <div id="host-claim" hidden>
+          <label class="field">
+            <span class="field-label">Host-PIN</span>
+            <input id="host-pin" class="input" type="password" autocomplete="off" />
+          </label>
+          <button class="button" id="btn-claim-host">Host werden</button>
+        </div>
+
+        <div id="host-tools" hidden>
+          <label class="field" id="host-name-field">
+            <span class="field-label">Name des Casinos</span>
+            <input id="host-casino-name" class="input" type="text" maxlength="24" />
+          </label>
+          <button class="button" id="btn-rename-casino">Namen übernehmen</button>
+
+          <div class="settings-block">
+            <p class="eyebrow">Neue Session</p>
+            <p class="settings-note" id="reset-note">
+              Setzt das Guthaben <strong>aller</strong> Gäste zurück und bricht laufende Runden ab.
+            </p>
+            <button class="button button--primary" id="btn-reset-chips">Alle auffüllen / Reset</button>
+          </div>
+        </div>
+
+        <button class="button button--ghost" id="btn-host-close">Schließen</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="overlay-guests" hidden>
+      <div class="sheet sheet--wide sheet--scroll">
+        <h2 class="sheet-title">Wer ist gerade da?</h2>
+        <ul class="guest-list" id="guest-list"></ul>
+        <button class="button" id="btn-guests-close">Schließen</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="overlay-info" hidden>
+      <div class="sheet sheet--wide sheet--scroll">
+        <h2 class="sheet-title" id="info-title">Spielinfo</h2>
+        <div id="info-body" class="rules"></div>
+        <button class="button" id="btn-info-close">Schließen</button>
+      </div>
+    </div>
+
+    <div class="toast-host" id="toast-host"></div>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
