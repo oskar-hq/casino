@@ -12,9 +12,10 @@
  *   onEvent(event, ctx)   → Animationen und Einblendungen
  */
 
+import blackjack from './blackjack.js';
 import holdem from './holdem.js';
 
-const VIEWS = new Map([[holdem.id, holdem]]);
+const VIEWS = new Map([holdem, blackjack].map((view) => [view.id, view]));
 
 /** Fällt auf ein leeres Modul zurück, falls der Server ein unbekanntes Spiel meldet. */
 const FALLBACK = { id: 'unknown' };

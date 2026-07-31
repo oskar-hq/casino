@@ -935,6 +935,128 @@ select.input {
   }
 }
 
+/* ---------------------------------------------------------- Blackjack */
+
+.dealer-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.dealer-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.dealer-cards {
+  display: flex;
+  gap: 4px;
+}
+
+.hand-total {
+  padding: 1px 9px;
+  background: rgba(4, 12, 9, 0.75);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hand-total--bust {
+  color: var(--bad);
+  border-color: rgba(242, 112, 127, 0.5);
+}
+
+.shoe-note {
+  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Trennt bei einem Split die Hände am Platz voneinander. */
+.hand-divider {
+  width: 2px;
+  align-self: stretch;
+  margin-inline: 3px;
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 2px;
+}
+
+.card--active-hand {
+  outline: 2px solid var(--good);
+  outline-offset: 1px;
+  border-radius: 5px;
+}
+
+.seat--playing .seat-plate {
+  border-color: var(--good);
+}
+
+/* Die eigenen Hände unten – beim Blackjack liegen sie offen. */
+.own-hand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+}
+
+.own-hand--active {
+  border-color: rgba(69, 209, 154, 0.5);
+  background: rgba(69, 209, 154, 0.07);
+}
+
+.own-hand-cards {
+  display: flex;
+  gap: 4px;
+}
+
+.own-hand-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.own-hand-label {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+}
+
+.outcome {
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.outcome--win,
+.outcome--blackjack {
+  background: rgba(69, 209, 154, 0.16);
+  color: var(--good);
+}
+
+.outcome--lose,
+.outcome--bust {
+  background: rgba(242, 112, 127, 0.16);
+  color: var(--bad);
+}
+
+.outcome--push {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-dim);
+}
+
+/* Mehrere eigene Hände nebeneinander statt untereinander. */
+.dock-hand:has(.own-hand + .own-hand) {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
 /* -------------------------------------------------------------- Seitenpanel */
 
 .side-panel {
