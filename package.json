@@ -1,0 +1,22 @@
+{
+  "name": "casino-floor",
+  "version": "1.0.0",
+  "description": "Selbstgehostetes Web-Casino mit Spielgeld – Poker, Blackjack, Slots, Roulette und Baccarat auf einem gemeinsamen Floor",
+  "type": "module",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pokersolver": "^2.1.4",
+    "ws": "^8.18.0"
+  },
+  "license": "MIT",
+  "private": true
+}
