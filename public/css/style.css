@@ -1199,6 +1199,343 @@ select.input {
   line-height: 1.4;
 }
 
+/* ----------------------------------------------------------- Roulette */
+
+.wheel {
+  display: grid;
+  place-items: center;
+}
+
+.wheel-face {
+  display: grid;
+  place-items: center;
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 0deg,
+      #1b232e 0 10deg, #cf2438 10deg 20deg,
+      #1b232e 20deg 30deg, #cf2438 30deg 40deg,
+      #1b232e 40deg 50deg, #cf2438 50deg 60deg,
+      #1b232e 60deg 70deg, #cf2438 70deg 80deg,
+      #1b232e 80deg 90deg, #cf2438 90deg 100deg,
+      #1b232e 100deg 110deg, #cf2438 110deg 120deg,
+      #1b232e 120deg 130deg, #cf2438 130deg 140deg,
+      #1b232e 140deg 150deg, #cf2438 150deg 160deg,
+      #1b232e 160deg 170deg, #cf2438 170deg 180deg,
+      #1b232e 180deg 190deg, #cf2438 190deg 200deg,
+      #1b232e 200deg 210deg, #cf2438 210deg 220deg,
+      #1b232e 220deg 230deg, #cf2438 230deg 240deg,
+      #1b232e 240deg 250deg, #cf2438 250deg 260deg,
+      #1b232e 260deg 270deg, #cf2438 270deg 280deg,
+      #1b232e 280deg 290deg, #cf2438 290deg 300deg,
+      #1b232e 300deg 310deg, #cf2438 310deg 320deg,
+      #1b232e 320deg 330deg, #cf2438 330deg 340deg,
+      #1b232e 340deg 350deg, #16794f 350deg 360deg
+    );
+  border: 4px solid var(--gold-strong);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.55),
+    inset 0 0 18px rgba(0, 0, 0, 0.5);
+}
+
+.wheel-face--spinning {
+  animation: wheel-spin 1.1s linear infinite;
+}
+
+@keyframes wheel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.wheel-inner {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: #0b1a13;
+  border: 2px solid rgba(232, 182, 76, 0.5);
+  /* Die Zahl soll beim Drehen des Rades stehen bleiben. */
+  animation: inherit;
+  animation-direction: reverse;
+}
+
+.wheel-dots {
+  color: var(--text-faint);
+  letter-spacing: 2px;
+}
+
+.wheel-number {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  padding-inline: 6px;
+  border-radius: 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.wheel-number--red {
+  background: #cf2438;
+}
+
+.wheel-number--black {
+  background: #1b232e;
+}
+
+.wheel-number--green {
+  background: #16794f;
+}
+
+.wheel-history {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.history-chip {
+  display: grid;
+  place-items: center;
+  min-width: 21px;
+  height: 21px;
+  padding-inline: 4px;
+  border-radius: 5px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.history-chip--red {
+  background: rgba(207, 36, 56, 0.85);
+}
+
+.history-chip--black {
+  background: rgba(27, 35, 46, 0.9);
+}
+
+.history-chip--green {
+  background: rgba(22, 121, 79, 0.9);
+}
+
+.bet-clock {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 14px;
+  background: rgba(4, 12, 9, 0.75);
+  border: 1px solid rgba(232, 182, 76, 0.35);
+  border-radius: 999px;
+}
+
+.bet-clock-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+
+.bet-clock-time {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- Tableau */
+
+.tableau {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-width: 44rem;
+  margin-inline: auto;
+}
+
+.tableau-grid {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(12, 1fr) 1.2fr;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2px;
+}
+
+.tab-number,
+.tab-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 26px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tab-number[data-color='red'] {
+  background: #a91d2e;
+}
+
+.tab-number[data-color='black'] {
+  background: #171d26;
+}
+
+.tab-number[data-color='green'] {
+  background: #126b46;
+}
+
+.tab-number:hover:not(:disabled),
+.tab-cell:hover:not(:disabled) {
+  outline: 2px solid var(--gold);
+  outline-offset: -1px;
+}
+
+.tab-number:disabled,
+.tab-cell:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tab-zero {
+  border-radius: 4px 4px 4px 4px;
+}
+
+.tab-side {
+  width: 100%;
+  height: 100%;
+}
+
+.tab-red {
+  background: #a91d2e;
+}
+
+.tab-black {
+  background: #171d26;
+}
+
+.tableau-dozens,
+.tableau-outside {
+  display: grid;
+  gap: 2px;
+}
+
+.tableau-dozens {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.tableau-outside {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.tableau-dozens .tab-cell,
+.tableau-outside .tab-cell {
+  min-height: 30px;
+}
+
+/* Der gesetzte Betrag als kleiner Chip auf dem Feld. */
+.tab-chip {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  padding: 0 4px;
+  background: var(--gold);
+  color: #221a08;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.chip-tray {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.chip-tray-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.chip-row {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+}
+
+.chip-token {
+  flex: 1;
+  padding: 7px 4px;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  background: var(--chip);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  aspect-ratio: 1;
+}
+
+.chip-token.is-active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(232, 182, 76, 0.4);
+}
+
+.chip-token:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.bet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bet-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  font-size: 0.74rem;
+}
+
+.bet-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bet-odds {
+  color: var(--text-faint);
+  font-size: 0.66rem;
+}
+
+.bet-amount-side {
+  font-weight: 700;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
 /* -------------------------------------------------------------- Seitenpanel */
 
 .side-panel {
