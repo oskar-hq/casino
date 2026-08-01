@@ -58,6 +58,7 @@ export default {
     return { ...config, smallBlind, bigBlind };
   },
 
+  stakesLabel: 'Blinds',
   describeStakes: (config) => `${config.smallBlind}/${config.bigBlind}`,
 
   /** Zusatzinfos fürs Frontend (Cheat-Sheet am Rand des Tisches). */

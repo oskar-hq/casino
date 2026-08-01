@@ -1,0 +1,52 @@
+services:
+  casino:
+    build: .
+    image: ${IMAGE_NAME:-casino-floor}:${IMAGE_TAG:-latest}
+    # Überschreibbar, damit sich eine Testinstanz parallel betreiben lässt.
+    container_name: ${CONTAINER_NAME:-casino-floor}
+    restart: unless-stopped
+    environment:
+      # Port im Container UND nach außen – einfach hier ändern.
+      PORT: ${PORT:-3000}
+      NODE_ENV: production
+
+      # ---- Floor ----------------------------------------------------------
+      CASINO_NAME: ${CASINO_NAME:-Chip Palace}
+      # Startguthaben jedes Gastes und Zielwert des Reset-Knopfes.
+      CASINO_START_CHIPS: ${CASINO_START_CHIPS:-1000}
+      # Bedenkzeit pro Zug in ms; danach Auto-Fold/Check.
+      CASINO_TURN_MS: ${CASINO_TURN_MS:-30000}
+      # Bedenkzeit eines Bots, damit man seine Züge mitlesen kann.
+      CASINO_BOT_MS: ${CASINO_BOT_MS:-1100}
+      # Wer diesen PIN kennt, kann Host werden. Leer = der erste Gast wird Host.
+      CASINO_HOST_PIN: ${CASINO_HOST_PIN:-}
+      CASINO_DB: /data/casino.db
+
+      # ---- Spiele (optional; sonst gelten die Vorgaben der Module) ---------
+      # HOLDEM_SMALL_BLIND: 5
+      # HOLDEM_BIG_BLIND: 10
+      # BLACKJACK_DECKS: 6
+      # BLACKJACK_MIN_BET: 10
+      # ROULETTE_BET_MS: 25000
+      # BACCARAT_DECKS: 8
+    ports:
+      # Nur auf localhost binden – nach außen geht es über den Funnel.
+      - '127.0.0.1:${PORT:-3000}:${PORT:-3000}'
+    volumes:
+      # Guthaben und Tischdefinitionen überleben einen Neustart.
+      - casino-data:/data
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 4s
+      retries: 3
+      start_period: 8s
+
+volumes:
+  casino-data:

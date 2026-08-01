@@ -80,7 +80,9 @@ function tableCard(table, game, you, onJoin) {
         el('span.table-card-name', { text: table.name }),
         el('span.table-card-code', { text: table.code }),
       ]),
-      table.stakes ? el('span.table-stakes', { text: `Blinds ${table.stakes}` }) : null,
+      table.stakes
+        ? el('span.table-stakes', { text: `${table.stakesLabel ?? 'Einsatz'} ${table.stakes}` })
+        : null,
       occupants,
       el('div.table-card-foot', {}, [
         el('span.seat-badge', {

@@ -443,6 +443,8 @@ export class CasinoTable {
         .filter(Boolean)
         .map((seat) => ({ name: seat.name, isBot: seat.isBot, away: seat.away })),
       stakes: this.module.describeStakes?.(this.config) ?? null,
+      // „Blinds 5/10“ beim Poker, „Einsatz 10–500“ überall sonst.
+      stakesLabel: this.module.stakesLabel ?? 'Einsatz',
       createdAt: this.createdAt,
     };
   }
