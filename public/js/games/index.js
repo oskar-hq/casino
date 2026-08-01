@@ -14,8 +14,9 @@
 
 import blackjack from './blackjack.js';
 import holdem from './holdem.js';
+import slots from './slots.js';
 
-const VIEWS = new Map([holdem, blackjack].map((view) => [view.id, view]));
+const VIEWS = new Map([holdem, blackjack, slots].map((view) => [view.id, view]));
 
 /** Fällt auf ein leeres Modul zurück, falls der Server ein unbekanntes Spiel meldet. */
 const FALLBACK = { id: 'unknown' };

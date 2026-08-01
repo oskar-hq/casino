@@ -21,9 +21,10 @@ import { moduleDefaults } from '../server/config.js';
 
 import blackjack from './blackjack/index.js';
 import holdem from './holdem/index.js';
+import slots from './slots/index.js';
 
 /** Reihenfolge = Reihenfolge auf dem Floor. */
-const MODULES = [holdem, blackjack];
+const MODULES = [holdem, blackjack, slots];
 
 /** Vorgaben aus dem Modul, überschrieben von den Env-Variablen. */
 const withEnvDefaults = (module) => ({

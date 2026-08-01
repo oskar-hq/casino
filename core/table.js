@@ -475,6 +475,12 @@ export class CasinoTable {
       ),
       spectators: this.spectators.size,
       youSeated: Boolean(this.seatOf(playerId)),
+      /**
+       * Das eigene Guthaben, frisch aus dem Wallet. Am Tisch ändert es sich
+       * mit jedem Einsatz – die Floor-Übersicht wird dafür nicht jedes Mal
+       * neu verschickt, deshalb steht es hier direkt mit drin.
+       */
+      yourChips: this.wallet.balance(playerId),
       actorId: this.engine.actorId ?? null,
       deadline: this.engine.deadline ?? null,
       serverTime: Date.now(),

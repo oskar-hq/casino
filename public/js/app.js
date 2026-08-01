@@ -48,6 +48,9 @@ function render() {
   }
   if (app.table) {
     showScreen('table');
+    // Am Tisch zählt der Stand aus dem Tischzustand – er ist bei jedem Einsatz
+    // aktuell, während die Floor-Übersicht nur bei größeren Änderungen kommt.
+    app.you.chips = app.table.yourChips ?? app.you.chips;
     $('table-chips').textContent = chips(app.you.chips);
     renderTable({
       state: app.table,
