@@ -1536,6 +1536,138 @@ select.input {
   font-variant-numeric: tabular-nums;
 }
 
+/* ----------------------------------------------------------- Baccarat */
+
+.bac-table {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.bac-hand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(4, 12, 9, 0.45);
+}
+
+.bac-hand--banker {
+  border-color: rgba(232, 182, 76, 0.3);
+}
+
+.bac-label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.bac-cards {
+  display: flex;
+  gap: 3px;
+}
+
+.hand-total--winner {
+  background: rgba(69, 209, 154, 0.2);
+  border-color: rgba(69, 209, 154, 0.5);
+  color: var(--good);
+}
+
+.roadmap {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.road-dot {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.road-dot--player {
+  background: #2a6fd6;
+}
+
+.road-dot--banker {
+  background: #cf2438;
+}
+
+.road-dot--tie {
+  background: #16794f;
+}
+
+/* Die drei Setzfelder unten. */
+.bac-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 7px;
+}
+
+.bac-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 6px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.bac-side:active {
+  transform: scale(0.97);
+}
+
+.bac-side--player {
+  border-color: rgba(42, 111, 214, 0.5);
+}
+
+.bac-side--banker {
+  border-color: rgba(207, 36, 56, 0.5);
+}
+
+.bac-side--tie {
+  border-color: rgba(22, 121, 79, 0.5);
+}
+
+.bac-side.is-active {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.bac-side-name {
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.bac-side-odds {
+  font-size: 0.64rem;
+  color: var(--text-faint);
+}
+
+.bac-side-total {
+  margin-top: 2px;
+  padding: 0 7px;
+  background: rgba(232, 182, 76, 0.18);
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
 /* -------------------------------------------------------------- Seitenpanel */
 
 .side-panel {
