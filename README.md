@@ -60,6 +60,32 @@ npm test
 4. **Der Host** (der erste Gast, oder wer den PIN kennt) hat oben rechts den
    Host-Bereich mit dem Reset-Knopf.
 
+### Weggehen
+
+Rausgehen geht **immer** – in jedem Spiel und in jeder Phase, auch mitten in
+einer laufenden Runde:
+
+- **„‹ Floor“** oben links am Tisch → zurück auf den Floor.
+- **„Tisch“ → „Aufstehen, weiter zuschauen“** → Platz freigeben, aber
+  weiter zusehen.
+- **„Verlassen“** oben rechts auf dem Floor → zurück zum Eingang.
+
+Was dabei mit den Chips passiert, hängt vom Spiel ab – und ist immer die
+Regel, die auch am echten Tisch gilt:
+
+| Situation | Chips |
+| --- | --- |
+| Roulette/Baccarat, Rad dreht noch nicht | Einsatz kommt zurück |
+| Roulette/Baccarat, schon gedreht/gegeben | Wette läuft, Gewinn wird gutgeschrieben |
+| Blackjack, noch in der Setzphase | Einsatz kommt zurück |
+| Blackjack, Karten liegen | Hand bleibt stehen und wird normal abgerechnet |
+| Slots, Walzen laufen | Dreh wird zu Ende gerechnet, Gewinn kommt an |
+| Poker, mitten in der Hand | gilt als Fold; was im Pot liegt, bleibt im Pot |
+
+Der Sitzplatz wird sofort frei, der Tisch spielt ohne Unterbrechung weiter.
+Das Guthaben bleibt auf dem Server – mit demselben Namen kommt man jederzeit
+mit dem gleichen Stand zurück.
+
 Ein paar Regeln, die bewusst so sind:
 
 - **Kein Rebuy.** Wer bei 0 steht, kann nicht mehr setzen und sitzt aus.

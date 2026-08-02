@@ -75,6 +75,9 @@
           </button>
           <button class="icon-button" id="btn-guests" title="Wer ist da?">Gäste</button>
           <button class="icon-button" id="btn-host" title="Host-Bereich" hidden>Host</button>
+          <button class="icon-button icon-button--danger" id="btn-leave-casino" title="Casino verlassen">
+            Verlassen
+          </button>
         </div>
       </header>
 
@@ -163,6 +166,16 @@
           <button class="button button--ghost" id="btn-copy-code">Tisch-Code kopieren</button>
         </div>
 
+        <div class="settings-block" id="leave-block">
+          <p class="eyebrow">Weggehen</p>
+          <p class="settings-note">
+            Aufstehen geht jederzeit – auch mitten in der Runde. Beim Poker giltst du dann als
+            ausgestiegen, noch nicht gedrehte Einsätze bekommst du zurück.
+          </p>
+          <button class="button" id="btn-stand" hidden>Aufstehen, weiter zuschauen</button>
+          <button class="button" id="btn-leave-table">Zurück zum Floor</button>
+        </div>
+
         <button class="button button--danger" id="btn-close-table">Tisch schließen</button>
         <button class="button" id="btn-settings-done">Fertig</button>
       </div>
@@ -198,6 +211,18 @@
         </div>
 
         <button class="button button--ghost" id="btn-host-close">Schließen</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="overlay-leave" hidden>
+      <div class="sheet">
+        <h2 class="sheet-title">Casino verlassen?</h2>
+        <p class="sheet-sub" id="leave-note">
+          Du stehst von deinem Tisch auf und landest wieder am Eingang. Dein Guthaben bleibt
+          erhalten – mit demselben Namen kommst du jederzeit zurück.
+        </p>
+        <button class="button button--danger" id="btn-leave-confirm">Ja, verlassen</button>
+        <button class="button button--ghost" id="btn-leave-cancel">Hierbleiben</button>
       </div>
     </div>
 

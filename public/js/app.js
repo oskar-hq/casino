@@ -27,6 +27,11 @@ const app = {
   pendingCode: null,
   createGame: null,
   createValues: null,
+  /**
+   * Hat der Gast das Casino bewusst verlassen? Dann darf ihn ein
+   * Wiederverbinden des Sockets nicht ungefragt zurückholen.
+   */
+  hasLeft: false,
 };
 
 const SCREENS = { entry: 'screen-entry', floor: 'screen-floor', table: 'screen-table' };
@@ -83,6 +88,7 @@ net.on('status', ({ online }) => {
 });
 
 net.on('entered', (message) => {
+  app.hasLeft = false;
   app.meId = message.playerId;
   app.you = {
     playerId: message.playerId,
@@ -133,6 +139,23 @@ net.on('table_closed', () => {
   resetTableView();
   toast('Tisch geschlossen');
   render();
+});
+
+net.on('left_casino', () => {
+  // Zurück auf Anfang. Das Guthaben bleibt auf dem Server; wer denselben Namen
+  // wieder eingibt, sitzt mit demselben Stand wieder drin.
+  const name = app.you?.name ?? '';
+  app.hasLeft = true;
+  app.meId = null;
+  app.you = null;
+  app.floor = null;
+  app.table = null;
+  app.events = [];
+  resetTableView();
+  session.clear();
+  $('input-name').value = name;
+  render();
+  toast('Bis zum nächsten Mal', 'good');
 });
 
 net.on('chips_reset', (message) => {
@@ -198,6 +221,33 @@ $('btn-guests').addEventListener('click', () => {
 });
 $('btn-guests-close').addEventListener('click', () => closeOverlay('overlay-guests'));
 
+// ------------------------------------------------------------- Weggehen
+
+/**
+ * Das Casino verlassen. Geht in jeder Lage – auch mitten in einer Runde.
+ * Der Server steht dafür vom Tisch auf, gibt noch nicht gedrehte Einsätze
+ * zurück und gibt den Platz sofort frei.
+ */
+$('btn-leave-casino').addEventListener('click', () => {
+  const seated = app.you?.seatedAt;
+  $('leave-note').textContent = seated
+    ? 'Du stehst von deinem Tisch auf und landest wieder am Eingang. Läuft gerade eine Runde, ' +
+      'giltst du als ausgestiegen. Dein Guthaben bleibt erhalten – mit demselben Namen kommst ' +
+      'du jederzeit zurück.'
+    : 'Du landest wieder am Eingang. Dein Guthaben bleibt erhalten – mit demselben Namen ' +
+      'kommst du jederzeit zurück.';
+  openOverlay('overlay-leave');
+});
+$('btn-leave-cancel').addEventListener('click', () => closeOverlay('overlay-leave'));
+$('btn-leave-confirm').addEventListener('click', () => {
+  closeOverlay('overlay-leave');
+  send({ type: 'leave_casino' });
+  // Notausgang: Sollte die Antwort ausbleiben (Verbindung weg), trotzdem raus.
+  setTimeout(() => {
+    if (app.you) net.emit('left_casino', {});
+  }, 1500);
+});
+
 // --------------------------------------------------------- Tisch eröffnen
 
 function openCreateDialog(game) {
@@ -237,6 +287,8 @@ $('btn-settings-done').addEventListener('click', () => closeOverlay('overlay-tab
 function updateSettingsDialog() {
   const table = app.table;
   if (!table) return;
+  // Aufstehen bietet sich nur an, wenn man auch sitzt.
+  show($('btn-stand'), Boolean(table.youSeated));
   const bots = table.seats.filter((seat) => seat.isBot);
   $('bot-count').textContent = String(bots.length);
   const level = bots[0]?.difficulty ?? 'medium';
@@ -273,6 +325,22 @@ $('btn-copy-code').addEventListener('click', async () => {
   } catch {
     toast(`Tisch-Code: ${app.table.code}`);
   }
+});
+
+// Aufstehen: Platz freigeben, aber weiter zuschauen.
+$('btn-stand').addEventListener('click', () => {
+  if (!app.table) return;
+  send({ type: 'stand' });
+  closeOverlay('overlay-table-settings');
+});
+
+// Ganz weg vom Tisch, zurück auf den Floor.
+$('btn-leave-table').addEventListener('click', () => {
+  send({ type: 'leave_table' });
+  app.table = null;
+  resetTableView();
+  closeOverlay('overlay-table-settings');
+  render();
 });
 
 $('btn-close-table').addEventListener('click', () => {
@@ -382,6 +450,8 @@ function boot() {
 
   // Beim (Wieder-)Verbinden automatisch zurück ins Casino.
   net.resume = () => {
+    // Wer bewusst gegangen ist, wird nicht durch einen Reconnect zurückgeholt.
+    if (app.hasLeft) return null;
     const saved = session.load();
     const name = saved?.name ?? $('input-name').value.trim();
     if (!saved || name.length < 2) return null;

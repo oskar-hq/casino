@@ -335,6 +335,15 @@ select.input {
   background: var(--surface-strong);
 }
 
+.icon-button--danger {
+  border-color: rgba(242, 112, 127, 0.35);
+  color: var(--bad);
+}
+
+.icon-button--danger:hover {
+  background: rgba(242, 112, 127, 0.14);
+}
+
 /* ------------------------------------------------------------------ Topbar */
 
 .topbar {
@@ -2369,6 +2378,21 @@ select.input {
 @media (max-width: 619px) {
   .seat {
     max-width: 7rem;
+  }
+
+  /* Auf dem Floor bekommt der Casino-Name eine eigene Zeile – sonst quetschen
+     ihn Guthaben und Knöpfe auf ein einzelnes Zeichen zusammen. */
+  .screen--floor .topbar {
+    flex-wrap: wrap;
+    row-gap: 9px;
+  }
+
+  .screen--floor .topbar-group {
+    flex: 1 0 100%;
+  }
+
+  .screen--floor .topbar-group:last-child {
+    justify-content: space-between;
   }
 
   /* Der Tisch-Code steht im Einrichten-Dialog – oben fehlt dafür der Platz. */

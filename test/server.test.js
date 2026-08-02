@@ -456,6 +456,184 @@ test('Server: mehrere Tabs desselben Spielers bekommen beide den Zustand', async
   assert.equal(floor.floor.tables[0].code, code);
 });
 
+// ------------------------------------------------------------ Weggehen
+
+/**
+ * Kernzusage: Wer weg will, kommt weg – in jedem Spiel und in jeder Phase.
+ * Der Platz wird sofort frei, der Tisch läuft ohne den Weggegangenen weiter.
+ */
+for (const spiel of ['holdem', 'blackjack', 'slots', 'roulette', 'baccarat']) {
+  test(`Server: aufstehen geht bei ${spiel} jederzeit`, async (t) => {
+    const { server, connect } = await setup(t);
+    const anna = await connect('Anna');
+
+    anna.send({ type: 'create_table', game: spiel });
+    const { code } = await anna.wait('table_created');
+    anna.send({ type: 'sit', code, seat: 0 });
+    await tableWhere(anna, (state) => state.youSeated);
+
+    // Bei Solo-Automaten gibt es keine Bots; sonst läuft eine Runde an.
+    if (spiel !== 'slots') anna.send({ type: 'add_bot', code });
+    // Kurz laufen lassen, damit wirklich mitten in etwas hineingegriffen wird.
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    anna.send({ type: 'stand' });
+    const gestanden = await tableWhere(anna, (state) => !state.youSeated);
+    assert.equal(gestanden.state.seats[0].playerId, null, 'der Platz ist sofort frei');
+
+    const table = server.casino.table(code);
+    assert.equal(table.seatOf(anna.playerId), null);
+    assert.ok(table.spectators.has(anna.playerId), 'zuschauen darf man weiter');
+    assert.equal(server.casino.player(anna.playerId).seatedAt, null);
+  });
+
+  test(`Server: das Casino verlassen geht bei ${spiel} jederzeit`, async (t) => {
+    const { server, connect } = await setup(t);
+    const anna = await connect('Anna');
+
+    anna.send({ type: 'create_table', game: spiel });
+    const { code } = await anna.wait('table_created');
+    anna.send({ type: 'sit', code, seat: 0 });
+    await tableWhere(anna, (state) => state.youSeated);
+    if (spiel !== 'slots') anna.send({ type: 'add_bot', code });
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    anna.send({ type: 'leave_casino' });
+    await anna.next('left_casino');
+
+    const table = server.casino.table(code);
+    assert.equal(table.seatOf(anna.playerId), null, 'der Platz ist frei');
+    assert.equal(table.spectators.has(anna.playerId), false, 'und niemand schaut mehr zu');
+    assert.equal(server.casino.player(anna.playerId).online, false);
+    assert.equal(
+      server.casino.guests().some((guest) => guest.id === anna.playerId),
+      false,
+      'aus der Gästeliste ist er raus',
+    );
+  });
+}
+
+test('Server: nach dem Verlassen kommt man mit demselben Namen zurück', async (t) => {
+  const { server, connect } = await setup(t);
+  const anna = await connect('Anna');
+  server.casino.debit(anna.playerId, 250, 'test');
+
+  anna.send({ type: 'leave_casino' });
+  await anna.next('left_casino');
+
+  // Dieselbe Verbindung darf sofort wieder eintreten.
+  anna.send({ type: 'enter', name: 'Anna' });
+  const wieder = await anna.next('entered');
+  assert.equal(wieder.playerId, anna.playerId, 'dieselbe Geldbörse');
+  assert.equal(wieder.chips, 750, 'mit demselben Stand');
+});
+
+test('Server: wer mitten im Zug aufsteht, blockiert den Tisch nicht', async (t) => {
+  const { server, connect } = await setup(t, { botMs: 5 });
+  const anna = await connect('Anna');
+
+  anna.send({ type: 'create_table', game: 'holdem', config: { smallBlind: 5, bigBlind: 10 } });
+  const { code } = await anna.wait('table_created');
+  anna.send({ type: 'sit', code, seat: 0 });
+  await tableWhere(anna, (state) => state.youSeated);
+  anna.send({ type: 'add_bot', code });
+  anna.send({ type: 'add_bot', code });
+
+  // Warten, bis Anna wirklich am Zug ist.
+  await tableWhere(anna, (state) => state.actorId === anna.playerId);
+  const table = server.casino.table(code);
+  const handVorher = table.engine.handNumber;
+
+  anna.send({ type: 'stand' });
+  await tableWhere(anna, (state) => !state.youSeated);
+
+  // Die Bots spielen unter sich weiter – der Tisch bleibt nicht auf Anna warten.
+  await until(() => table.engine.handNumber > handVorher, { timeout: 15_000 });
+  assert.notEqual(table.engine.actorId, anna.playerId);
+  assert.deepEqual(
+    anna.messages.filter((message) => message.type === 'error'),
+    [],
+  );
+});
+
+test('Server: beim Weggehen kommen noch nicht gedrehte Einsätze zurück', async (t) => {
+  const { server, connect } = await setup(t);
+  const anna = await connect('Anna');
+
+  anna.send({ type: 'create_table', game: 'roulette', config: { minBet: 10, maxBet: 500 } });
+  const { code } = await anna.wait('table_created');
+  anna.send({ type: 'sit', code });
+  await tableWhere(anna, (state) => state.youSeated);
+
+  anna.send({
+    type: 'action',
+    code,
+    action: { move: 'bet', betType: 'red', arg: null, amount: 200 },
+  });
+  await until(() => server.casino.balanceOf(anna.playerId) === 800);
+
+  anna.send({ type: 'leave_casino' });
+  await anna.next('left_casino');
+  assert.equal(
+    server.casino.balanceOf(anna.playerId),
+    1000,
+    'das Rad hat sich nicht gedreht – also gibt es die Chips zurück',
+  );
+});
+
+test('Server: ein weggegangener Gast bekommt seinen Gewinn trotzdem gutgeschrieben', async (t) => {
+  const { server, connect } = await setup(t);
+  const anna = await connect('Anna');
+
+  anna.send({ type: 'create_table', game: 'slots', config: { minBet: 10, maxBet: 10 } });
+  const { code } = await anna.wait('table_created');
+  anna.send({ type: 'sit', code });
+  await tableWhere(anna, (state) => state.youSeated);
+
+  const table = server.casino.table(code);
+  anna.send({ type: 'action', code, action: { move: 'spin', amount: 10 } });
+  await until(() => table.engine.spinning);
+
+  // Mitten im Lauf der Walzen weggehen.
+  anna.send({ type: 'leave_casino' });
+  await anna.next('left_casino');
+
+  await until(() => !table.engine.spinning, { timeout: 5000 });
+  const gewinn = table.engine.lastResult.amount;
+  assert.equal(
+    server.casino.balanceOf(anna.playerId),
+    990 + gewinn,
+    'der Einsatz war weg, also muss auch der Gewinn kommen',
+  );
+});
+
+test('Server: mehrere Gäste können gleichzeitig gehen', async (t) => {
+  const { server, connect } = await setup(t);
+  const anna = await connect('Anna');
+  const ben = await connect('Ben');
+  const cem = await connect('Cem');
+
+  anna.send({ type: 'create_table', game: 'holdem' });
+  const { code } = await anna.wait('table_created');
+  for (const [client, seat] of [
+    [anna, 0],
+    [ben, 1],
+    [cem, 2],
+  ]) {
+    client.send({ type: 'view_table', code });
+    await client.wait('table_state');
+    client.send({ type: 'sit', code, seat });
+    await tableWhere(client, (state) => state.youSeated);
+  }
+
+  for (const client of [anna, ben, cem]) client.send({ type: 'leave_casino' });
+  for (const client of [anna, ben, cem]) await client.next('left_casino');
+
+  const table = server.casino.table(code);
+  assert.equal(table.occupiedCount, 0, 'der Tisch ist leer');
+  assert.equal(server.casino.guests().length, 0, 'und das Casino auch');
+});
+
 // ------------------------------------------------------------ Ausdauer
 
 test('Server: ein Tisch mit lauter Bots läuft ohne Fehler durch', async (t) => {
