@@ -7,6 +7,7 @@
 
 import { chips, el, toast } from '../dom.js';
 import { renderCard } from '../cards.js';
+import { countdown } from '../tableview.js';
 
 const OUTCOME_LABEL = {
   win: 'Gewonnen',
@@ -51,6 +52,12 @@ export default {
           : null,
       ]),
       el('p.felt-phase', { text: `${PHASE_LABEL[game.phase] ?? game.phase} · Runde ${game.roundNumber}` }),
+      game.phase === 'betting'
+        ? el('div.bet-clock', {}, [
+            el('span.bet-clock-label', { text: 'Einsätze bitte' }),
+            countdown(ctx.state.deadline ?? 0, 'bet-clock-time'),
+          ])
+        : null,
       el('p.shoe-note', {
         text: `Schuh: noch ${game.shoe.remaining} von ${game.shoe.total} Karten`,
       }),
@@ -193,6 +200,15 @@ export default {
             onClick: () => act({ move: 'bet', amount: betAmount }),
           }),
         ].filter(Boolean)),
+        // Startknopf: Sind alle bereit, werden sofort Karten gegeben.
+        el('button.action.action--spin-now', {
+          class: state.private?.youReady ? 'is-waiting' : '',
+          disabled: !placed && !state.private?.youReady,
+          onClick: () => act({ move: 'ready', value: !state.private?.youReady }),
+        }, [
+          el('span.spin-now-label', { text: readyLabel(game, placed, state.private?.youReady) }),
+          el('span.spin-now-note', { text: 'Oder einfach den Countdown abwarten' }),
+        ]),
       ];
     }
 
@@ -268,6 +284,14 @@ export default {
     }
   },
 };
+
+/** Beschriftung des Startknopfes in der Setzphase. */
+function readyLabel(game, placed, youReady) {
+  const ready = game.ready ?? { ready: 0, total: 1 };
+  if (!placed && !youReady) return 'Erst einen Einsatz setzen';
+  if (!youReady) return ready.total > 1 ? 'Fertig – ich bin bereit' : 'Karten geben';
+  return ready.total > 1 ? `Warte auf die anderen (${ready.ready}/${ready.total})` : 'Geht los …';
+}
 
 function handStatus(box, hand) {
   if (!hand) return null;

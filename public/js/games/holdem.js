@@ -11,8 +11,7 @@
  */
 
 import { chips, el, toast } from '../dom.js';
-import { renderCard } from '../cards.js';
-import { attachPeek } from '../tableview.js';
+import { cardsFromCodes, renderCard } from '../cards.js';
 
 const PHASE_LABEL = {
   waiting: 'Warten auf Spieler',
@@ -33,18 +32,41 @@ const ACTION_LABEL = {
   allin: 'ALL IN',
 };
 
+/**
+ * Die Handrangfolge von stark nach schwach – jede mit einer Beispielhand.
+ * Gezeigt werden echte Karten statt einer Beschreibung: „Q Q Q 4 4“ versteht
+ * man auf einen Blick, „Drilling + Paar“ muss man erst übersetzen.
+ */
 const HAND_RANKINGS = [
-  ['Royal Flush', 'A K D B 10 – eine Farbe'],
-  ['Straight Flush', 'Fünf in Folge, eine Farbe'],
-  ['Vierling', 'Vier gleiche Werte'],
-  ['Full House', 'Drilling + Paar'],
-  ['Flush', 'Fünf gleiche Farbe'],
-  ['Straße', 'Fünf in Folge'],
-  ['Drilling', 'Drei gleiche Werte'],
-  ['Zwei Paare', 'Zwei mal zwei gleiche'],
-  ['Ein Paar', 'Zwei gleiche Werte'],
-  ['Höchste Karte', 'Sonst zählt die höchste'],
+  { name: 'Royal Flush', cards: ['As', 'Ks', 'Qs', 'Js', 'Ts'] },
+  { name: 'Straight Flush', cards: ['9h', '8h', '7h', '6h', '5h'] },
+  { name: 'Vierling', cards: ['7s', '7h', '7d', '7c', 'Ks'] },
+  { name: 'Full House', cards: ['Qs', 'Qh', 'Qd', '4c', '4s'] },
+  { name: 'Flush', cards: ['Kd', 'Td', '8d', '5d', '3d'] },
+  { name: 'Straße', cards: ['9s', '8d', '7h', '6c', '5s'] },
+  { name: 'Drilling', cards: ['5s', '5h', '5d', 'Kc', '2s'] },
+  { name: 'Zwei Paare', cards: ['Js', 'Jh', '6d', '6c', 'As'] },
+  { name: 'Ein Paar', cards: ['As', 'Ah', '9d', '5c', '3s'] },
+  { name: 'Höchste Karte', cards: ['As', 'Qd', '9h', '6c', '3s'] },
 ];
+
+/** Eine Zeile der Handrangfolge: Name über der Beispielhand. */
+function rankingRow(entry, index) {
+  return el('li.ranking-item', {}, [
+    el('div.ranking-head', {}, [
+      el('span.ranking-rank', { text: String(index + 1) }),
+      el('span.ranking-name', { text: entry.name }),
+    ]),
+    el(
+      'div.ranking-cards',
+      {},
+      cardsFromCodes(...entry.cards).map((card) => renderCard(card, { mini: true })),
+    ),
+  ]);
+}
+
+const rankingList = () =>
+  el('ol.ranking-list', {}, HAND_RANKINGS.map((entry, index) => rankingRow(entry, index)));
 
 /** Merkt sich den zuletzt eingestellten Erhöhungsbetrag pro Zugsituation. */
 let raiseValue = null;
@@ -86,10 +108,11 @@ export default {
       return { status: game?.phase === 'waiting' ? null : 'sitzt aus' };
     }
 
-    // Am Tisch liegen alle Karten verdeckt – auch die eigenen. Seine eigenen
-    // sieht man unten im Dock (hochwischen), fremde erst beim Showdown.
+    // Die eigenen Karten liegen immer offen, fremde erst beim Showdown.
+    const own = seat.playerId === ctx.meId ? ctx.state.private?.cards : null;
+    const known = player.cards ?? own;
     const cards = Array.from({ length: player.cardCount }, (_, index) =>
-      renderCard(player.cards?.[index] ?? null, {
+      renderCard(known?.[index] ?? null, {
         small: true,
         extra: player.folded ? 'card--folded' : '',
       }),
@@ -115,20 +138,14 @@ export default {
   renderHand(ctx) {
     const cards = ctx.state.private?.cards;
     if (!cards?.length) return [];
-
-    const stack = el(
-      'div.peek-hand',
-      { title: 'Hochwischen oder gedrückt halten zum Ansehen' },
-      cards.map((card, index) =>
-        el('div.peek-card', { style: { '--i': index } }, [
-          renderCard(card, { extra: 'peek-face' }),
-          renderCard(null, { extra: 'peek-back' }),
-        ]),
+    // Die eigenen Karten liegen dauerhaft offen – kein Aufdecken nötig.
+    return [
+      el(
+        'div.own-cards',
+        {},
+        cards.map((card) => renderCard(card, { extra: 'own-card' })),
       ),
-    );
-    attachPeek(stack, {});
-
-    return [stack, el('p.peek-hint', { text: 'Hochwischen bzw. gedrückt halten' })];
+    ];
   },
 
   // ------------------------------------------------------------- Aktionen
@@ -227,20 +244,9 @@ export default {
 
   // ------------------------------------------------------- Handrangfolge
 
+  /** Der Spickzettel am Rand – über die Kopfzeile ein- und ausklappbar. */
   renderSidePanel() {
-    return [
-      el('h3.panel-title', { text: 'Handrangfolge' }),
-      el(
-        'ol.ranking-list',
-        {},
-        HAND_RANKINGS.map(([name, note]) =>
-          el('li.ranking-item', {}, [
-            el('span.ranking-name', { text: name }),
-            el('span.ranking-note', { text: note }),
-          ]),
-        ),
-      ),
-    ];
+    return { title: 'Handrangfolge', body: [rankingList()] };
   },
 
   info(ctx) {
@@ -270,6 +276,10 @@ export default {
           'Dein Stack am Tisch ist dein Guthaben auf dem Floor. Einsätze werden sofort abgebucht, ' +
           'Gewinne sofort gutgeschrieben. Deshalb kannst du immer nur an einem Tisch sitzen.',
       }),
+      // Am Handy ist das Panel am Rand ausgeblendet – hier steht es trotzdem.
+      el('h3', { text: 'Handrangfolge' }),
+      el('p', { text: 'Von oben nach unten: die beste Hand zuerst.' }),
+      rankingList(),
     ];
   },
 

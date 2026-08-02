@@ -14,6 +14,7 @@
 
 import { GameEngine, GameError } from '../../core/engine.js';
 import { Shoe } from '../../core/cards.js';
+import { ReadySet } from '../../core/ready.js';
 import { botBetAmount, decideBlackjack } from './bot.js';
 
 export const SETTLE_MS = 4500;
@@ -38,6 +39,8 @@ export class BlackjackEngine extends GameEngine {
     this.betsPlaced = new Map();
     this.result = null;
     this.timer = null;
+    /** Wer ist mit dem Setzen fertig? Sind alle so weit, wird sofort gegeben. */
+    this.readySet = new ReadySet(() => this.ctx.seats());
   }
 
   get timings() {
@@ -60,7 +63,10 @@ export class BlackjackEngine extends GameEngine {
     // nicht über die normale Zugsteuerung, sondern gleich hier. Das passiert
     // bewusst noch im selben Durchlauf: Sonst würde an einem reinen Bot-Tisch
     // nie jemand setzen und es käme nie zu einer Runde.
-    if (this.phase === 'betting') this.placeBotBets();
+    if (this.phase === 'betting') {
+      this.placeBotBets();
+      this.maybeDealEarly();
+    }
   }
 
   placeBotBets() {
@@ -92,6 +98,7 @@ export class BlackjackEngine extends GameEngine {
     this.result = null;
     this.boxes = [];
     this.betsPlaced = new Map();
+    this.readySet.reset();
     this.dealer = { cards: [], done: false };
     this.currentDeadline = Date.now() + this.timings.bet;
     this.timer = this.ctx.later(() => {
@@ -125,6 +132,26 @@ export class BlackjackEngine extends GameEngine {
     this.ctx.wallet.debit(playerId, bet, 'blackjack:bet');
     this.betsPlaced.set(playerId, bet);
     return bet;
+  }
+
+  /** „Ich bin fertig.“ Sind alle so weit, wird sofort gegeben. */
+  setReady(playerId, value) {
+    if (this.phase !== 'betting') {
+      throw new GameError('not_betting', 'Gerade wird nicht gesetzt.');
+    }
+    if (!this.ctx.seats().some((seat) => seat.playerId === playerId)) {
+      throw new GameError('not_seated', 'Setz dich erst an den Tisch.');
+    }
+    this.readySet.set(playerId, value);
+    this.maybeDealEarly();
+  }
+
+  /** Gibt vorzeitig, wenn alle bereit sind und wenigstens einer gesetzt hat. */
+  maybeDealEarly() {
+    if (this.phase !== 'betting') return;
+    if (!this.readySet.allReady()) return;
+    if (!this.betsPlaced.size) return;
+    this.closeBetting();
   }
 
   closeBetting() {
@@ -228,6 +255,12 @@ export class BlackjackEngine extends GameEngine {
   act(playerId, action) {
     if (action?.move === 'bet') {
       this.placeBet(playerId, action.amount);
+      // Wer den Einsatz ändert, ist offensichtlich noch nicht fertig.
+      this.readySet.set(playerId, false);
+      return;
+    }
+    if (action?.move === 'ready') {
+      this.setReady(playerId, action.value !== false);
       return;
     }
     if (this.phase !== 'players') throw new GameError('not_playing', 'Gerade ist kein Zug dran.');
@@ -454,6 +487,7 @@ export class BlackjackEngine extends GameEngine {
       result: this.result,
       // Einsätze in der Setzphase sind öffentlich – das ist am Tisch auch so.
       bets: [...this.betsPlaced.entries()].map(([playerId, amount]) => ({ playerId, amount })),
+      ready: this.readySet.progress(),
       boxes: this.boxes.map((box, boxIndex) => ({
         playerId: box.playerId,
         seat: box.seatIndex,
@@ -495,6 +529,7 @@ export class BlackjackEngine extends GameEngine {
       bet: this.betsPlaced.get(playerId) ?? 0,
       balance: this.ctx.wallet.balance(playerId),
       canBet: this.phase === 'betting',
+      youReady: this.readySet.has(playerId),
       options: hand
         ? {
             canHit: true,

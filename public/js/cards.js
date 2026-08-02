@@ -191,6 +191,24 @@ export function cardFaceSvg(card) {
     </svg>`;
 }
 
+/**
+ * Stark verkleinerte Karte: nur Wert und Farbsymbol, dafür groß.
+ *
+ * Für Beispielhände (Handrangfolge) – eine normale Karte wäre bei 30 px
+ * Breite nicht mehr zu entziffern, diese hier schon.
+ */
+export function cardMiniSvg(card) {
+  const color = SUIT_COLORS[card.suit];
+  const label = RANK_LABELS[card.rank] ?? card.rank;
+  return `
+    <svg class="card-svg card-svg--${color}" viewBox="0 0 100 140" role="img"
+         aria-label="${SUIT_NAMES[card.suit]} ${label}">
+      <rect class="card-bg" x="2" y="2" width="96" height="136" rx="12"/>
+      <text class="mini-rank${label.length > 1 ? ' mini-rank--long' : ''}" x="50" y="63">${label}</text>
+      <g transform="translate(50 100) scale(1.5) translate(-12 -12)"><path d="${SUIT_PATHS[card.suit]}"/></g>
+    </svg>`;
+}
+
 /** Rückseite – ein Rautenmuster, das sich gut vom Filz abhebt. */
 export function cardBackSvg() {
   return `
@@ -215,13 +233,32 @@ export function cardBackSvg() {
  * @param {string} [options.extra] zusätzliche CSS-Klassen
  * @param {boolean} [options.small] kleinere Darstellung
  */
-export function renderCard(card, { extra = '', small = false } = {}) {
-  const classes = ['card', small && 'card--small', !card && 'card--back', extra]
+export function renderCard(card, { extra = '', small = false, mini = false } = {}) {
+  const classes = [
+    'card',
+    small && 'card--small',
+    mini && 'card--mini',
+    !card && 'card--back',
+    extra,
+  ]
     .filter(Boolean)
     .join(' ');
-  const node = el(`div`, { class: classes, html: card ? cardFaceSvg(card) : cardBackSvg() });
+  const face = mini ? cardMiniSvg : cardFaceSvg;
+  const node = el(`div`, { class: classes, html: card ? face(card) : cardBackSvg() });
   if (card) node.dataset.code = card.code;
   return node;
+}
+
+/**
+ * Baut Karten aus Kurzschreibweisen: `cardsFromCodes('As','Ks')`.
+ * Praktisch für feste Beispielhände.
+ */
+export function cardsFromCodes(...codes) {
+  return codes.map((code) => ({
+    code,
+    rank: code.slice(0, -1),
+    suit: code.slice(-1),
+  }));
 }
 
 /** Mehrere Karten hintereinander; `null` steht für eine verdeckte Karte. */

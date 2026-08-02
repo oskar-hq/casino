@@ -5,8 +5,9 @@
  * Setzfelder. Es gibt nichts zu entscheiden – nur zu setzen und zuzusehen.
  */
 
-import { chips, el, seconds, toast } from '../dom.js';
+import { chips, el, toast } from '../dom.js';
 import { renderCard } from '../cards.js';
+import { countdown } from '../tableview.js';
 
 const SIDE_LABELS = { player: 'Player', banker: 'Banker', tie: 'Tie' };
 const SIDE_ODDS = { player: '1:1', banker: '1:1 − 5 %', tie: '8:1' };
@@ -42,11 +43,10 @@ export default {
     ];
 
     if (game.phase === 'betting') {
-      const left = Math.max(0, (ctx.state.deadline ?? 0) - ctx.state.serverTime);
       nodes.push(
         el('div.bet-clock', {}, [
           el('span.bet-clock-label', { text: 'Einsätze bitte' }),
-          el('span.bet-clock-time', { text: `${seconds(left)} s` }),
+          countdown(ctx.state.deadline ?? 0, 'bet-clock-time'),
         ]),
       );
     } else if (game.phase === 'result' && game.result) {
@@ -161,6 +161,17 @@ export default {
             }),
           ])
         : null,
+      // Startknopf: Sind alle bereit, wird sofort gegeben.
+      el('button.action.action--spin-now', {
+        class: state.private?.youReady ? 'is-waiting' : '',
+        disabled: !current && !state.private?.youReady,
+        onClick: () => act({ move: 'ready', value: !state.private?.youReady }),
+      }, [
+        el('span.spin-now-label', {
+          text: readyLabel(game, state.private, 'Jetzt geben'),
+        }),
+        el('span.spin-now-note', { text: 'Oder einfach den Countdown abwarten' }),
+      ]),
     ].filter(Boolean);
   },
 
@@ -215,6 +226,17 @@ export default {
     );
   },
 };
+
+/**
+ * Beschriftung des Startknopfes. Am Einzeltisch heißt er schlicht „Jetzt
+ * geben“, mit mehreren Leuten wird daraus ein Bereit-Signal.
+ */
+function readyLabel(game, privateState, soloText) {
+  const ready = game.ready ?? { ready: 0, total: 1 };
+  if (!privateState?.bet && !privateState?.youReady) return 'Erst einen Einsatz wählen';
+  if (!privateState?.youReady) return ready.total > 1 ? 'Fertig – ich bin bereit' : soloText;
+  return ready.total > 1 ? `Warte auf die anderen (${ready.ready}/${ready.total})` : 'Geht los …';
+}
 
 function winnerClass(game, side) {
   if (game.phase !== 'result' || !game.result) return '';

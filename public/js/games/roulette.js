@@ -6,7 +6,8 @@
  * Zwischen zwei Zahlen tippen (Cheval) geht über die schmalen Stege.
  */
 
-import { chips, el, seconds, toast } from '../dom.js';
+import { chips, el, toast } from '../dom.js';
+import { countdown } from '../tableview.js';
 
 const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 const colorOf = (n) => (n === 0 ? 'green' : RED.has(n) ? 'red' : 'black');
@@ -24,18 +25,17 @@ export default {
     const nodes = [wheel(game), history(game)];
 
     if (game.phase === 'betting') {
-      const left = Math.max(0, (ctx.state.deadline ?? 0) - ctx.state.serverTime);
       nodes.push(
         el('div.bet-clock', {}, [
           el('span.bet-clock-label', { text: 'Einsätze bitte' }),
-          el('span.bet-clock-time', { text: `${seconds(left)} s` }),
+          countdown(ctx.state.deadline ?? 0, 'bet-clock-time'),
         ]),
       );
     } else if (game.phase === 'spinning') {
-      el('p.felt-phase', { text: 'Rien ne va plus' });
-      nodes.push(el('p.felt-phase', { text: 'Rien ne va plus – die Kugel läuft' }));
+      nodes.push(el('p.felt-phase.felt-phase--big', { text: 'Rien ne va plus – die Kugel läuft' }));
     } else if (game.phase === 'result' && game.result) {
       nodes.push(resultBanner(game.result, ctx.meId));
+      nodes.push(el('p.felt-phase', { text: 'Gleich wird wieder gesetzt …' }));
     }
     return nodes.filter(Boolean);
   },
@@ -80,6 +80,8 @@ export default {
 
     const balance = state.private?.balance ?? 0;
     const placed = state.private?.total ?? 0;
+    const youReady = state.private?.youReady ?? false;
+    const ready = game.ready ?? { ready: 0, total: 1 };
     const act = (action) => send({ type: 'action', code: state.code, action });
     const values = chipValues(game.minBet, game.maxBet);
     if (chipValue === null || !values.includes(chipValue)) chipValue = values[0];
@@ -115,32 +117,40 @@ export default {
           disabled: !placed,
           onClick: () => act({ move: 'clear' }),
         }),
-        el('button.action.action--check', {
-          text: placed ? `Liegt: ${chips(placed)}` : 'Nichts gesetzt',
-          disabled: true,
-        }),
+      ]),
+      // Der eigentliche Startknopf. Sobald alle am Tisch bereit sind, dreht
+      // das Rad sofort – sonst spätestens, wenn der Countdown abläuft.
+      el('button.action.action--spin-now', {
+        class: youReady ? 'is-waiting' : '',
+        disabled: !placed && !youReady,
+        onClick: () => act({ move: 'ready', value: !youReady }),
+      }, [
+        el('span.spin-now-label', { text: startLabel({ placed, youReady, ready }) }),
+        el('span.spin-now-note', { text: startNote({ placed, youReady, ready }) }),
       ]),
     ];
   },
 
   renderSidePanel(ctx) {
     const bets = ctx.state.private?.bets ?? [];
-    return [
-      el('h3.panel-title', { text: 'Deine Wetten' }),
-      bets.length
-        ? el(
-            'ul.bet-list',
-            {},
-            bets.map((bet) =>
-              el('li.bet-item', {}, [
-                el('span.bet-label', { text: bet.label }),
-                el('span.bet-odds', { text: `${bet.payout}:1` }),
-                el('span.bet-amount-side', { text: chips(bet.amount) }),
-              ]),
-            ),
-          )
-        : el('p.pay-note', { text: 'Noch nichts auf dem Tableau.' }),
-    ];
+    return {
+      title: 'Deine Wetten',
+      body: [
+        bets.length
+          ? el(
+              'ul.bet-list',
+              {},
+              bets.map((bet) =>
+                el('li.bet-item', {}, [
+                  el('span.bet-label', { text: bet.label }),
+                  el('span.bet-odds', { text: `${bet.payout}:1` }),
+                  el('span.bet-amount-side', { text: chips(bet.amount) }),
+                ]),
+              ),
+            )
+          : el('p.pay-note', { text: 'Noch nichts auf dem Tableau.' }),
+      ],
+    };
   },
 
   info() {
@@ -206,15 +216,26 @@ export default {
 
 // ------------------------------------------------------------------ Rad
 
+/**
+ * Das Rad. Beim Drehen beschleunigt der Kranz und bremst über die volle
+ * Spieldauer wieder ab, die Kugel läuft gegenläufig und wandert dabei nach
+ * innen. Die Zahl erscheint erst am Ende – der Client kennt sie vorher nicht,
+ * die Animation ist also reine Optik und verrät nichts.
+ */
 function wheel(game) {
+  const spinning = game.phase === 'spinning';
   const number = game.phase === 'result' ? game.number : null;
-  return el('div.wheel', {}, [
-    el(`div.wheel-face${game.phase === 'spinning' ? '.wheel-face--spinning' : ''}`, {}, [
-      el('div.wheel-inner', {}, [
-        number === null
-          ? el('span.wheel-dots', { text: '· · ·' })
-          : el(`span.wheel-number.wheel-number--${colorOf(number)}`, { text: String(number) }),
-      ]),
+  const dauer = `${game.spinMs ?? 5200}ms`;
+
+  return el('div.wheel', { style: { '--spin-ms': dauer } }, [
+    el(`div.wheel-face${spinning ? '.wheel-face--spinning' : ''}`),
+    el(`div.wheel-ball${spinning ? '.wheel-ball--spinning' : ''}`, { 'aria-hidden': 'true' }, [
+      el('span.wheel-ball-dot'),
+    ]),
+    el('div.wheel-inner', {}, [
+      number === null
+        ? el('span.wheel-dots', { text: spinning ? '· · ·' : '–' })
+        : el(`span.wheel-number.wheel-number--${colorOf(number)}`, { text: String(number) }),
     ]),
   ]);
 }
@@ -243,6 +264,20 @@ function resultBanner(result, meId) {
 }
 
 const colorLabel = (n) => ({ green: 'Null', red: 'Rot', black: 'Schwarz' })[colorOf(n)];
+
+/** Beschriftung des Startknopfes – sie erklärt, was als Nächstes passiert. */
+function startLabel({ placed, youReady, ready }) {
+  if (!placed && !youReady) return 'Erst Chips aufs Tableau legen';
+  if (!youReady) return ready.total > 1 ? 'Fertig – ich bin bereit' : 'Jetzt drehen';
+  return ready.total > 1 ? `Warte auf die anderen (${ready.ready}/${ready.total})` : 'Rad startet …';
+}
+
+function startNote({ placed, youReady, ready }) {
+  if (!placed && !youReady) return 'Tippe unten auf eine Zahl oder ein Feld';
+  if (youReady && ready.total > 1) return 'Nochmal tippen, um doch noch zu ändern';
+  if (ready.total > 1) return 'Das Rad dreht, sobald alle bereit sind';
+  return 'Oder einfach den Countdown abwarten';
+}
 
 // -------------------------------------------------------------- Tableau
 

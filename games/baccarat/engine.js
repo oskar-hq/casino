@@ -11,6 +11,7 @@
 
 import { GameEngine, GameError } from '../../core/engine.js';
 import { Shoe } from '../../core/cards.js';
+import { ReadySet } from '../../core/ready.js';
 import { chooseBotBet } from './bot.js';
 import {
   SIDES,
@@ -40,6 +41,8 @@ export class BaccaratEngine extends GameEngine {
     this.currentDeadline = null;
     this.result = null;
     this.history = [];
+    /** Wer ist mit dem Setzen fertig? Sind alle so weit, wird sofort gegeben. */
+    this.readySet = new ReadySet(() => this.ctx.seats());
   }
 
   get timings() {
@@ -67,7 +70,10 @@ export class BaccaratEngine extends GameEngine {
       if (!this.ctx.seats().length) return;
       this.openBetting();
     }
-    if (this.phase === 'betting') this.placeBotBets();
+    if (this.phase === 'betting') {
+      this.placeBotBets();
+      this.maybeDealEarly();
+    }
   }
 
   openBetting() {
@@ -80,6 +86,7 @@ export class BaccaratEngine extends GameEngine {
     this.player = [];
     this.banker = [];
     this.result = null;
+    this.readySet.reset();
     this.currentDeadline = Date.now() + this.timings.bet;
     this.ctx.emit({ kind: 'betting_open', until: this.currentDeadline });
     this.ctx.later(() => {
@@ -144,13 +151,40 @@ export class BaccaratEngine extends GameEngine {
   act(playerId, action) {
     if (action?.move === 'bet') {
       this.placeBet(playerId, action.side, action.amount);
+      // Wer den Einsatz ändert, ist offensichtlich noch nicht fertig.
+      this.readySet.set(playerId, false);
       return;
     }
     if (action?.move === 'clear') {
       this.placeBet(playerId, this.bets.get(playerId)?.side ?? 'player', 0);
+      this.readySet.set(playerId, false);
+      return;
+    }
+    if (action?.move === 'ready') {
+      this.setReady(playerId, action.value !== false);
       return;
     }
     throw new GameError('bad_action', 'Diesen Zug gibt es beim Baccarat nicht.');
+  }
+
+  /** „Ich bin fertig.“ Sind alle so weit, wird sofort gegeben. */
+  setReady(playerId, value) {
+    if (this.phase !== 'betting') {
+      throw new GameError('not_betting', 'Gerade wird nicht gesetzt.');
+    }
+    if (!this.ctx.seats().some((seat) => seat.playerId === playerId)) {
+      throw new GameError('not_seated', 'Setz dich erst an den Tisch.');
+    }
+    this.readySet.set(playerId, value);
+    this.maybeDealEarly();
+  }
+
+  /** Gibt vorzeitig, wenn alle bereit sind und wenigstens einer gesetzt hat. */
+  maybeDealEarly() {
+    if (this.phase !== 'betting') return;
+    if (!this.readySet.allReady()) return;
+    if (!this.bets.size) return;
+    this.deal();
   }
 
   // -------------------------------------------------------------- Die Coup
@@ -274,6 +308,7 @@ export class BaccaratEngine extends GameEngine {
       history: this.history,
       stakes,
       totals,
+      ready: this.readySet.progress(),
     };
   }
 
@@ -282,6 +317,7 @@ export class BaccaratEngine extends GameEngine {
     return {
       balance: this.ctx.wallet.balance(playerId),
       canBet: this.phase === 'betting',
+      youReady: this.readySet.has(playerId),
       bet,
     };
   }
@@ -294,6 +330,8 @@ export class BaccaratEngine extends GameEngine {
       this.ctx.wallet.credit(playerId, bet.amount, 'baccarat:refund');
       this.bets.delete(playerId);
     }
+    // Wer weg ist, darf den Start nicht länger aufhalten.
+    this.maybeDealEarly();
   }
 
   dispose() {

@@ -548,7 +548,9 @@ test('Server: wer mitten im Zug aufsteht, blockiert den Tisch nicht', async (t) 
   await tableWhere(anna, (state) => !state.youSeated);
 
   // Die Bots spielen unter sich weiter – der Tisch bleibt nicht auf Anna warten.
-  await until(() => table.engine.handNumber > handVorher, { timeout: 15_000 });
+  // Die laufende Hand muss erst zu Ende gespielt werden (inkl. Showdown-Pause),
+  // erst danach beginnt die nächste – das darf ruhig ein paar Sekunden dauern.
+  await until(() => table.engine.handNumber > handVorher, { timeout: 30_000 });
   assert.notEqual(table.engine.actorId, anna.playerId);
   assert.deepEqual(
     anna.messages.filter((message) => message.type === 'error'),

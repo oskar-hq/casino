@@ -10,6 +10,7 @@
  */
 
 import { GameEngine, GameError } from '../../core/engine.js';
+import { ReadySet } from '../../core/ready.js';
 import { WHEEL_ORDER, betPayout, betWins, colorOf, parseBet } from './bets.js';
 import { chooseBotBets } from './bot.js';
 
@@ -30,6 +31,8 @@ export class RouletteEngine extends GameEngine {
     this.winningNumber = null;
     this.result = null;
     this.history = [];
+    /** Wer ist mit dem Setzen fertig? Sind alle so weit, dreht das Rad sofort. */
+    this.readySet = new ReadySet(() => this.ctx.seats());
   }
 
   get timings() {
@@ -57,7 +60,11 @@ export class RouletteEngine extends GameEngine {
       if (!this.ctx.seats().length) return;
       this.openBetting();
     }
-    if (this.phase === 'betting') this.placeBotBets();
+    if (this.phase === 'betting') {
+      this.placeBotBets();
+      // Die Bots setzen sofort – danach kann es schon so weit sein.
+      this.maybeSpinEarly();
+    }
   }
 
   openBetting() {
@@ -66,6 +73,7 @@ export class RouletteEngine extends GameEngine {
     this.bets = new Map();
     this.result = null;
     this.winningNumber = null;
+    this.readySet.reset();
     this.currentDeadline = Date.now() + this.timings.bet;
     this.ctx.emit({ kind: 'betting_open', until: this.currentDeadline });
     this.ctx.later(() => {
@@ -160,16 +168,47 @@ export class RouletteEngine extends GameEngine {
     switch (action?.move) {
       case 'bet':
         this.placeBet(playerId, action.betType, action.arg, action.amount);
+        // Wer etwas Neues legt, ist offensichtlich noch nicht fertig.
+        this.readySet.set(playerId, false);
         return;
       case 'undo':
         this.undoBet(playerId);
+        this.readySet.set(playerId, false);
         return;
       case 'clear':
         this.clearBets(playerId);
+        this.readySet.set(playerId, false);
+        return;
+      case 'ready':
+        this.setReady(playerId, action.value !== false);
         return;
       default:
         throw new GameError('bad_action', 'Diesen Zug gibt es beim Roulette nicht.');
     }
+  }
+
+  /**
+   * „Ich bin fertig.“ Sobald alle sitzenden Menschen so weit sind, dreht das
+   * Rad sofort – niemand muss den Countdown abwarten.
+   */
+  setReady(playerId, value) {
+    if (this.phase !== 'betting') {
+      throw new GameError('not_betting', 'Gerade wird nicht gesetzt.');
+    }
+    if (!this.ctx.seats().some((seat) => seat.playerId === playerId)) {
+      throw new GameError('not_seated', 'Setz dich erst an den Tisch.');
+    }
+    this.readySet.set(playerId, value);
+    this.maybeSpinEarly();
+  }
+
+  /** Startet vorzeitig, wenn alle bereit sind und wenigstens etwas liegt. */
+  maybeSpinEarly() {
+    if (this.phase !== 'betting') return;
+    if (!this.readySet.allReady()) return;
+    const etwasLiegt = [...this.bets.values()].some((list) => list.length > 0);
+    if (!etwasLiegt) return;
+    this.spin();
   }
 
   // ------------------------------------------------------------------ Rad
@@ -179,14 +218,11 @@ export class RouletteEngine extends GameEngine {
     this.phase = 'spinning';
     this.currentDeadline = null;
 
-    // Die Zahl steht jetzt fest – die Animation zeigt sie nur noch.
+    // Die Zahl steht jetzt fest, bleibt aber bis zur Abrechnung auf dem Server.
+    // Das Ereignis meldet nur, *dass* gedreht wird und wie lange – sonst
+    // könnte ein Client die Zahl Sekunden vor allen anderen auslesen.
     this.winningNumber = this.ctx.rng.int(37);
-    this.ctx.emit({
-      kind: 'spin',
-      duration: this.timings.spin,
-      number: this.winningNumber,
-      pocket: WHEEL_ORDER.indexOf(this.winningNumber),
-    });
+    this.ctx.emit({ kind: 'spin', duration: this.timings.spin });
 
     this.ctx.later(() => {
       this.settle();
@@ -252,6 +288,8 @@ export class RouletteEngine extends GameEngine {
       history: this.history,
       stakes,
       wheel: WHEEL_ORDER,
+      spinMs: this.timings.spin,
+      ready: this.readySet.progress(),
     };
   }
 
@@ -260,6 +298,7 @@ export class RouletteEngine extends GameEngine {
     return {
       balance: this.ctx.wallet.balance(playerId),
       canBet: this.phase === 'betting',
+      youReady: this.readySet.has(playerId),
       total: list.reduce((sum, bet) => sum + bet.amount, 0),
       bets: list.map((bet) => ({
         type: bet.type,
@@ -281,6 +320,8 @@ export class RouletteEngine extends GameEngine {
       this.clearBets(playerId);
       this.bets.delete(playerId);
     }
+    // Wer weg ist, darf den Start nicht länger aufhalten.
+    this.maybeSpinEarly();
   }
 
   dispose() {

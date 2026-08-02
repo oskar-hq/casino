@@ -94,8 +94,12 @@ Ein paar Regeln, die bewusst so sind:
   Tisch *sitzen* – sonst ließe sich dasselbe Guthaben zweimal setzen.
 - **Verdeckte Karten sind wirklich verdeckt.** Beim Poker verlassen fremde
   Hole Cards den Server nie, beim Blackjack bleibt die Karte des Dealers bis
-  zu seinem Zug auf dem Server. Eigene Karten sieht man per **Hochwischen**
-  (Handy) bzw. **Gedrückthalten** (Desktop).
+  zu seinem Zug auf dem Server. Die **eigenen** Karten liegen immer offen –
+  man muss sie nicht erst aufdecken.
+- **Es geht los, wenn alle so weit sind.** Bei Roulette, Baccarat und
+  Blackjack läuft ein Countdown, aber niemand muss ihn abwarten: Ein Tippen
+  auf den grünen Knopf heißt „ich bin fertig“, und sobald alle am Tisch so
+  weit sind, geht es sofort los. Allein am Tisch startet man damit direkt.
 
 ## Umgebungsvariablen
 
@@ -194,6 +198,10 @@ Client rendert nur, was er geschickt bekommt. Konkret:
   und werden pro Empfänger einzeln erzeugt. `publicState()` enthält sie nicht –
   fremde Hole Cards, die Hole Card des Dealers, die Roulettezahl vor dem Dreh
   und das Slots-Ergebnis während der Animation verlassen den Server nicht.
+  Das gilt auch für die Animationsereignisse: Das Roulette meldet nur, *dass*
+  gedreht wird und wie lange. Die Kugelbahn im Browser ist reine Optik und
+  läuft bewusst nicht auf die Zahl zu – sonst wäre sie Sekunden vorher
+  auslesbar.
 - **Jede Aktion** wird serverseitig geprüft: Ist der Spieler am Zug, ist der
   Zug regelkonform, reicht das Guthaben. Der Client schickt nur Absichten.
 - **Einsätze** werden sofort vom Wallet abgebucht. Es gibt keinen Weg, Chips

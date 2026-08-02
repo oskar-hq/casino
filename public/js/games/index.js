@@ -7,7 +7,9 @@
  *   seatDecor(seat, ctx)  → { cards, bet, status, badge, className } pro Platz
  *   renderHand(ctx)       → die eigenen Karten unten
  *   renderActions(ctx)    → die Knöpfe unten
- *   renderSidePanel(ctx)  → Panel am Rand (z. B. die Handrangfolge)
+ *   renderSidePanel(ctx)  → Panel am Rand. `{ title, body }` macht es
+ *                           ein- und ausklappbar (Zustand wird gemerkt),
+ *                           eine reine Knotenliste bleibt fest stehen.
  *   info(ctx)             → Inhalt des Spielinfo-Dialogs
  *   onEvent(event, ctx)   → Animationen und Einblendungen
  */

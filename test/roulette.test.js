@@ -359,6 +359,135 @@ test('Roulette: der Abbruch gibt offene Einsätze zurück', (t) => {
   assert.equal(balances.get('a'), 1000);
 });
 
+// ------------------------------------------------------------- „Bereit“
+
+/**
+ * Der Countdown allein war die Hauptquelle für Verwirrung: Man hatte gesetzt,
+ * aber nichts passierte. Deshalb kann jeder signalisieren, dass er fertig ist –
+ * sobald alle so weit sind, dreht das Rad sofort.
+ */
+test('Roulette: wer allein am Tisch sitzt, startet mit „bereit“ sofort', (t) => {
+  const { engine } = makeTable(t, { stacks: { a: 1000 }, config: { betMs: 60_000 } });
+  engine.tick();
+  engine.act('a', { move: 'bet', betType: 'red', arg: null, amount: 50 });
+  assert.equal(engine.phase, 'betting', 'ohne Signal wartet das Rad');
+
+  engine.act('a', { move: 'ready' });
+  assert.equal(engine.phase, 'spinning', 'mit Signal geht es sofort los');
+});
+
+test('Roulette: ohne Einsatz dreht sich nichts', (t) => {
+  const { engine } = makeTable(t, { stacks: { a: 1000 }, config: { betMs: 60_000 } });
+  engine.tick();
+  engine.act('a', { move: 'ready' });
+  assert.equal(engine.phase, 'betting', 'ein leeres Tableau lohnt keine Drehung');
+});
+
+test('Roulette: mit mehreren Leuten wird auf alle gewartet', (t) => {
+  const { engine } = makeTable(t, {
+    stacks: { a: 1000, b: 1000, c: 1000 },
+    config: { betMs: 60_000 },
+  });
+  engine.tick();
+  engine.act('a', { move: 'bet', betType: 'red', arg: null, amount: 20 });
+
+  engine.act('a', { move: 'ready' });
+  assert.equal(engine.phase, 'betting', 'B und C sind noch nicht so weit');
+  assert.deepEqual(engine.publicState().ready, { ready: 1, total: 3, ids: ['a'] });
+
+  engine.act('b', { move: 'ready' });
+  assert.equal(engine.phase, 'betting');
+
+  engine.act('c', { move: 'ready' });
+  assert.equal(engine.phase, 'spinning', 'jetzt sind alle bereit');
+});
+
+test('Roulette: wer noch etwas ändert, gilt wieder als nicht bereit', (t) => {
+  const { engine } = makeTable(t, {
+    stacks: { a: 1000, b: 1000 },
+    config: { betMs: 60_000 },
+  });
+  engine.tick();
+  engine.act('a', { move: 'bet', betType: 'red', arg: null, amount: 20 });
+  engine.act('a', { move: 'ready' });
+  assert.equal(engine.readySet.has('a'), true);
+
+  engine.act('a', { move: 'bet', betType: 'black', arg: null, amount: 20 });
+  assert.equal(engine.readySet.has('a'), false, 'eine neue Wette hebt das Signal auf');
+
+  engine.act('b', { move: 'ready' });
+  assert.equal(engine.phase, 'betting', 'A muss erneut bestätigen');
+});
+
+test('Roulette: wer den Tisch verlässt, hält den Start nicht auf', (t) => {
+  const { table, engine } = makeTable(t, {
+    stacks: { a: 1000, b: 1000 },
+    config: { betMs: 60_000 },
+  });
+  engine.tick();
+  engine.act('a', { move: 'bet', betType: 'red', arg: null, amount: 20 });
+  engine.act('a', { move: 'ready' });
+  assert.equal(engine.phase, 'betting');
+
+  table.stand('b');
+  assert.equal(engine.phase, 'spinning', 'jetzt ist A allein und bereit');
+});
+
+test('Roulette: an einem reinen Bot-Tisch entscheidet weiter der Countdown', async (t) => {
+  const { table } = makeTable(t, {
+    stacks: {},
+    config: { betMs: 150, spinMs: 20, resultMs: 20, minBet: 5, maxBet: 20 },
+    seed: 4,
+  });
+  table.addSpectator('zuschauer');
+  table.addBot('medium');
+  const engine = table.engine;
+
+  table.sync();
+  // Bots setzen sofort – trotzdem darf nicht sofort gedreht werden, sonst
+  // rasen die Runden ohne Publikum durch.
+  assert.equal(engine.phase, 'betting');
+  await wait(400);
+  assert.ok(engine.roundNumber >= 1);
+});
+
+test('Roulette: „bereit“ geht nur im Setzfenster und nur im Sitzen', (t) => {
+  const { engine } = makeTable(t, { stacks: { a: 1000 }, config: { betMs: 60_000 } });
+  engine.tick();
+  assert.throws(() => engine.act('zuschauer', { move: 'ready' }), /an den Tisch/);
+
+  engine.act('a', { move: 'bet', betType: 'red', arg: null, amount: 10 });
+  engine.act('a', { move: 'ready' });
+  assert.equal(engine.phase, 'spinning');
+  assert.throws(() => engine.act('a', { move: 'ready' }), /wird nicht gesetzt/);
+});
+
+// ------------------------------------------------------ Geheimhaltung II
+
+test('Roulette: auch das Dreh-Ereignis verrät die Zahl nicht', (t) => {
+  const { table, engine } = makeTable(t, {
+    stacks: { a: 1000 },
+    config: { betMs: 60_000, spinMs: 5000 },
+  });
+  engine.tick();
+  engine.act('a', { move: 'bet', betType: 'red', arg: null, amount: 10 });
+  table.takeEvents(); // Puffer leeren
+
+  engine.act('a', { move: 'ready' });
+  const events = table.takeEvents();
+  const spin = events.find((event) => event.kind === 'spin');
+  assert.ok(spin, 'ein Dreh-Ereignis muss kommen');
+  assert.deepEqual(
+    Object.keys(spin).sort(),
+    ['duration', 'kind'],
+    'es meldet nur, dass gedreht wird und wie lange',
+  );
+
+  // Auch der Zustand während der Drehung schweigt noch.
+  assert.equal(table.stateFor('a').public.number, null);
+  assert.ok(engine.winningNumber !== null, 'serverseitig steht sie längst fest');
+});
+
 // ------------------------------------------------------------------- Bots
 
 test('Roulette: Bots setzen gültige Wetten und der Tisch läuft durch', async (t) => {

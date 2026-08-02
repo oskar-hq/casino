@@ -26,6 +26,14 @@ const SYMBOL_LABELS = {
   seven: 'Sieben',
 };
 
+/**
+ * Der Streifen, der während des Drehens durchläuft. Er wird doppelt gerendert,
+ * damit die Schleife nahtlos ist – welche Symbole dabei vorbeifliegen, ist
+ * reine Optik. Das Ergebnis steht längst auf dem Server fest.
+ */
+const STRIP_BASE = ['cherry', 'bell', 'lemon', 'diamond', 'clover', 'seven', 'lemon', 'cherry'];
+const STRIP = [...STRIP_BASE, ...STRIP_BASE];
+
 /** Zuletzt gewählter Einsatz. */
 let betAmount = null;
 /** Verhindert, dass dieselbe Drehung mehrfach animiert wird. */
@@ -38,12 +46,24 @@ export default {
     const game = ctx.state.public;
     if (!game) return [];
 
+    // Während des Drehens läuft ein echter Symbolstreifen durch; steht das
+    // Ergebnis, rasten die Walzen nacheinander ein (Verzögerung über --reel).
     const reels = game.reels.map((symbol, index) =>
-      el(`div.reel${game.spinning ? '.reel--spinning' : ''}`, { style: { '--reel': index } }, [
-        el('span.reel-symbol', {
-          text: SYMBOL_ICONS[symbol] ?? '?',
-          title: SYMBOL_LABELS[symbol] ?? symbol,
-        }),
+      el(`div.reel${game.spinning ? '.reel--spinning' : '.reel--stopped'}`, {
+        style: { '--reel': index },
+      }, [
+        game.spinning
+          ? el(
+              'div.reel-strip',
+              {},
+              STRIP.map((entry) =>
+                el('span.reel-symbol', { text: SYMBOL_ICONS[entry] ?? '?' }),
+              ),
+            )
+          : el('span.reel-symbol.reel-symbol--final', {
+              text: SYMBOL_ICONS[symbol] ?? '?',
+              title: SYMBOL_LABELS[symbol] ?? symbol,
+            }),
       ]),
     );
 
@@ -159,11 +179,13 @@ export default {
         }),
       ]),
     );
-    return [
-      el('h3.panel-title', { text: 'Auszahlungen' }),
-      el('ul.pay-list', {}, rows),
-      el('p.pay-note', { text: 'Vielfaches des Einsatzes. Zwei gleiche zahlen nur oben.' }),
-    ];
+    return {
+      title: 'Auszahlungen',
+      body: [
+        el('ul.pay-list', {}, rows),
+        el('p.pay-note', { text: 'Vielfaches des Einsatzes. Zwei gleiche zahlen nur oben.' }),
+      ],
+    };
   },
 
   info(ctx) {

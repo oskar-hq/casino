@@ -17,6 +17,48 @@ import { getView } from './games/index.js';
 /** Merkt sich, welche Karten schon „hereingeflogen“ sind. */
 let lastDealKey = null;
 
+/** Läuft, solange irgendwo ein Countdown angezeigt wird. */
+let countdownTimer = null;
+/** Differenz zwischen Server- und Clientuhr, damit die Zeit wirklich stimmt. */
+let clockOffset = 0;
+
+/**
+ * Hält alle Countdowns am Laufen.
+ *
+ * Ein Element mit `data-deadline="<Zeitpunkt>"` bekommt sekündlich die
+ * Restzeit eingetragen. Ohne das würde die Anzeige nur bei Serverpaketen
+ * aktualisiert – und bei einem 25-Sekunden-Setzfenster sieht ein
+ * stehengebliebener Countdown so aus, als wäre das Spiel eingefroren.
+ */
+function tickCountdowns() {
+  const nodes = document.querySelectorAll('[data-deadline]');
+  if (!nodes.length) {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+    return;
+  }
+  const now = Date.now() + clockOffset;
+  for (const node of nodes) {
+    const left = Number(node.dataset.deadline) - now;
+    node.textContent = `${Math.max(0, Math.ceil(left / 1000))} s`;
+    node.classList.toggle('is-urgent', left <= 5000);
+  }
+}
+
+function startCountdowns() {
+  if (countdownTimer) return;
+  countdownTimer = setInterval(tickCountdowns, 250);
+}
+
+/** Ein Countdown-Feld, das von selbst weiterläuft. */
+export function countdown(deadline, extraClass = '') {
+  const node = el(`span.countdown${extraClass ? `.${extraClass}` : ''}`, {
+    dataset: { deadline: String(deadline) },
+  });
+  node.textContent = `${Math.max(0, Math.ceil((deadline - Date.now() - clockOffset) / 1000))} s`;
+  return node;
+}
+
 /**
  * Zeichnet den kompletten Tisch.
  * @param {object} ctx { state, meId, send, events }
@@ -27,12 +69,15 @@ export function renderTable(ctx) {
 
   $('table-title').textContent = state.name;
   $('table-code').textContent = state.code;
+  // Uhrenabgleich: Der Server schickt seine Zeit mit, der Client rechnet um.
+  clockOffset = state.serverTime - Date.now();
 
   renderSeats(ctx, view);
   fill($('felt-center'), view.renderCenter?.(ctx) ?? []);
   renderDock(ctx, view);
   renderSidePanel(ctx, view);
   runEvents(ctx, view);
+  startCountdowns();
 }
 
 // --------------------------------------------------------------- Sitzplätze
@@ -150,11 +195,63 @@ function renderDock(ctx, view) {
   fill($('dock-actions'), view.renderActions?.(ctx) ?? []);
 }
 
+const PANEL_KEY = 'casino.panel';
+
+/** Ist das Randpanel dieses Spiels eingeklappt? */
+const panelCollapsed = (gameId) => {
+  try {
+    return localStorage.getItem(`${PANEL_KEY}.${gameId}`) === 'zu';
+  } catch {
+    return false;
+  }
+};
+
+const setPanelCollapsed = (gameId, collapsed) => {
+  try {
+    localStorage.setItem(`${PANEL_KEY}.${gameId}`, collapsed ? 'zu' : 'auf');
+  } catch {
+    /* Privater Modus – dann eben nur für diese Sitzung. */
+  }
+};
+
+/**
+ * Das Panel am Rand. Ein Modul liefert entweder `{ title, body }` – dann wird
+ * es ein- und ausklappbar – oder einfach eine Liste von Knoten.
+ */
 function renderSidePanel(ctx, view) {
   const panel = $('side-panel');
   const content = view.renderSidePanel?.(ctx);
   show(panel, Boolean(content));
-  if (content) fill(panel, content);
+  if (!content) return;
+
+  if (Array.isArray(content)) {
+    panel.classList.remove('is-collapsed');
+    fill(panel, content);
+    return;
+  }
+
+  const gameId = ctx.state.game;
+  const collapsed = panelCollapsed(gameId);
+  panel.classList.toggle('is-collapsed', collapsed);
+
+  const toggle = el(
+    'button.panel-toggle',
+    {
+      type: 'button',
+      'aria-expanded': String(!collapsed),
+      title: collapsed ? 'Ausklappen' : 'Einklappen',
+      onClick: () => {
+        setPanelCollapsed(gameId, !panelCollapsed(gameId));
+        renderSidePanel(ctx, view);
+      },
+    },
+    [
+      el('span.panel-title', { text: content.title }),
+      el('span.panel-chevron', { text: collapsed ? '+' : '−', 'aria-hidden': 'true' }),
+    ],
+  );
+
+  fill(panel, [toggle, collapsed ? null : el('div.panel-body', {}, content.body)]);
 }
 
 // ---------------------------------------------------------------- Animation
@@ -204,63 +301,6 @@ function animateDeal(event, ctx) {
     });
     setTimeout(() => ghost.remove(), 900 + order * 70);
   });
-}
-
-/**
- * Hochwischen (Handy) bzw. gedrückt halten (Desktop) deckt die eigenen
- * verdeckten Karten auf.
- */
-export function attachPeek(node, { onChange }) {
-  let startY = null;
-  let peeking = false;
-
-  const setPeek = (value) => {
-    if (peeking === value) return;
-    peeking = value;
-    node.classList.toggle('is-peeking', value);
-    onChange?.(value);
-  };
-
-  node.addEventListener('touchstart', (event) => {
-    startY = event.touches[0].clientY;
-  }, { passive: true });
-
-  node.addEventListener(
-    'touchmove',
-    (event) => {
-      if (startY === null) return;
-      const delta = startY - event.touches[0].clientY;
-      setPeek(delta > 24);
-    },
-    { passive: true },
-  );
-
-  const end = () => {
-    startY = null;
-    setPeek(false);
-  };
-  node.addEventListener('touchend', end);
-  node.addEventListener('touchcancel', end);
-
-  node.addEventListener('mousedown', (event) => {
-    event.preventDefault();
-    setPeek(true);
-  });
-  node.addEventListener('mouseup', end);
-  node.addEventListener('mouseleave', end);
-
-  // Tastatur: Leertaste hält die Karten offen.
-  node.tabIndex = 0;
-  node.addEventListener('keydown', (event) => {
-    if (event.key === ' ' || event.key === 'Enter') {
-      event.preventDefault();
-      setPeek(true);
-    }
-  });
-  node.addEventListener('keyup', end);
-  node.addEventListener('blur', end);
-
-  return node;
 }
 
 /** Vor dem Verlassen eines Tisches den Animationszustand zurücksetzen. */
