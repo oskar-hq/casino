@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS players (
   token      TEXT NOT NULL,
   chips      INTEGER NOT NULL,
   created_at INTEGER NOT NULL,
-  last_seen  INTEGER NOT NULL
+  last_seen  INTEGER NOT NULL,
+  last_topup INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS tables (
@@ -66,17 +67,21 @@ export class CasinoDb {
     this.db.exec('PRAGMA journal_mode = WAL;');
     this.db.exec('PRAGMA foreign_keys = ON;');
     this.db.exec(SCHEMA);
+    this.migrate();
     this.statements = {
       playerByKey: this.db.prepare('SELECT * FROM players WHERE name_key = ?'),
       playerById: this.db.prepare('SELECT * FROM players WHERE id = ?'),
       insertPlayer: this.db.prepare(
-        `INSERT INTO players (id, name, name_key, token, chips, created_at, last_seen)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO players (id, name, name_key, token, chips, created_at, last_seen, last_topup)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       ),
+      topUp: this.db.prepare('UPDATE players SET chips = ?, last_topup = ? WHERE id = ?'),
       updateChips: this.db.prepare('UPDATE players SET chips = ?, last_seen = ? WHERE id = ?'),
       touchPlayer: this.db.prepare('UPDATE players SET last_seen = ? WHERE id = ?'),
       renamePlayer: this.db.prepare('UPDATE players SET name = ?, name_key = ? WHERE id = ?'),
-      resetChips: this.db.prepare('UPDATE players SET chips = ?, last_seen = ?'),
+      // Der Reset des Hosts zählt als Auffüllung – die 24-Stunden-Frist
+      // beginnt danach von vorn.
+      resetChips: this.db.prepare('UPDATE players SET chips = ?, last_seen = ?, last_topup = ?'),
       allPlayers: this.db.prepare('SELECT * FROM players ORDER BY chips DESC, name ASC'),
       insertLedger: this.db.prepare(
         `INSERT INTO ledger (player_id, delta, balance, reason, created_at) VALUES (?, ?, ?, ?, ?)`,
@@ -103,6 +108,21 @@ export class CasinoDb {
     };
   }
 
+  /**
+   * Nachträglich hinzugekommene Spalten ergänzen.
+   *
+   * `CREATE TABLE IF NOT EXISTS` lässt eine bestehende Tabelle unangetastet –
+   * eine Datenbank aus einer älteren Version hätte die neue Spalte also nicht.
+   */
+  migrate() {
+    const spalten = new Set(
+      this.db.prepare('PRAGMA table_info(players)').all().map((row) => row.name),
+    );
+    if (!spalten.has('last_topup')) {
+      this.db.exec('ALTER TABLE players ADD COLUMN last_topup INTEGER NOT NULL DEFAULT 0');
+    }
+  }
+
   // -------------------------------------------------------------- Spieler
 
   findPlayerByNameKey(nameKey) {
@@ -115,8 +135,15 @@ export class CasinoDb {
 
   createPlayer({ id, name, nameKey, token, chips }) {
     const now = Date.now();
-    this.statements.insertPlayer.run(id, name, nameKey, token, chips, now, now);
+    // Wer neu ist, hat sein Startguthaben gerade bekommen – die Frist für die
+    // nächste automatische Auffüllung läuft also ab jetzt.
+    this.statements.insertPlayer.run(id, name, nameKey, token, chips, now, now, now);
     return this.findPlayerById(id);
+  }
+
+  /** Guthaben auffüllen und den Zeitpunkt vermerken. */
+  topUp(playerId, chips, at = Date.now()) {
+    this.statements.topUp.run(chips, at, playerId);
   }
 
   setChips(playerId, chips) {
@@ -133,7 +160,8 @@ export class CasinoDb {
 
   /** Der Reset-Knopf des Hosts: alle zurück auf das Startguthaben. */
   resetAllChips(chips) {
-    this.statements.resetChips.run(chips, Date.now());
+    const now = Date.now();
+    this.statements.resetChips.run(chips, now, now);
   }
 
   allPlayers() {

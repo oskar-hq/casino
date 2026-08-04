@@ -5,7 +5,7 @@
  * wechselt der Dock je nach Phase zwischen Einsatzwahl und Spielzügen.
  */
 
-import { chips, el, toast } from '../dom.js';
+import { chips, el, quickAmounts, toast } from '../dom.js';
 import { renderCard } from '../cards.js';
 import { countdown } from '../tableview.js';
 
@@ -176,7 +176,7 @@ export default {
           el(
             'div.quick-row',
             {},
-            [min, 25, 50, 100].map((value) =>
+            quickAmounts(min, max).map((value) =>
               el('button.quick', {
                 text: chips(value),
                 onClick: () => {

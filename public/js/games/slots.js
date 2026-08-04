@@ -6,7 +6,7 @@
  * Die Animation zeigt es nur.
  */
 
-import { chips, el, toast } from '../dom.js';
+import { chips, el, quickAmounts, toast } from '../dom.js';
 
 const SYMBOL_ICONS = {
   cherry: '🍒',
@@ -41,6 +41,8 @@ let lastSpinToken = null;
 
 export default {
   id: 'slots',
+  /** Kein Spieltisch, sondern ein Gehäuse – siehe `.felt[data-layout]`. */
+  layout: 'machine',
 
   renderCenter(ctx) {
     const game = ctx.state.public;
@@ -68,23 +70,45 @@ export default {
     );
 
     const result = game.result;
+    const gewinn = result && !game.spinning && result.amount > 0;
+
+    // Das Gehäuse: Leuchtschrift oben, Walzenfenster, Anzeige darunter.
     return [
-      el('div.slot-machine', {}, [
-        el('div.slot-window', {}, reels),
-        el('div.slot-line', { 'aria-hidden': 'true' }),
+      el(`div.cabinet${game.spinning ? '.cabinet--busy' : ''}`, {}, [
+        el('div.cabinet-marquee', {}, [
+          el('span.cabinet-lamp'),
+          el('span.cabinet-title', { text: 'LUCKY SEVEN' }),
+          el('span.cabinet-lamp'),
+        ]),
+        el('div.cabinet-window', {}, [
+          el('div.slot-window', {}, reels),
+          el('div.slot-line', { 'aria-hidden': 'true' }),
+        ]),
+        el('div.cabinet-display', {}, [
+          el('div.cabinet-field', {}, [
+            el('span.cabinet-field-label', { text: 'Guthaben' }),
+            el('span.cabinet-field-value', { text: chips(ctx.state.yourChips ?? 0) }),
+          ]),
+          el('div.cabinet-field', {}, [
+            el('span.cabinet-field-label', { text: 'Gewinn' }),
+            el(`span.cabinet-field-value${gewinn ? '.is-win' : ''}`, {
+              text: result && !game.spinning ? chips(result.amount) : '—',
+            }),
+          ]),
+        ]),
+        el('div.cabinet-foot', {}, [
+          el('span.cabinet-note', {
+            text: game.spinning
+              ? 'Die Walzen laufen …'
+              : result
+                ? gewinn
+                  ? `${SYMBOL_LABELS[result.symbol]} ×${result.multiplier}`
+                  : 'Kein Treffer – nochmal?'
+                : `${game.stats.spins} Drehs an diesem Automaten`,
+          }),
+        ]),
       ]),
-      result && !game.spinning
-        ? el(`div.slot-result${result.amount > 0 ? '.slot-result--win' : ''}`, {
-            text:
-              result.amount > 0
-                ? `${SYMBOL_LABELS[result.symbol]} ×${result.multiplier} → +${chips(result.amount)}`
-                : 'Kein Treffer',
-          })
-        : null,
-      el('p.felt-phase', {
-        text: game.spinning ? 'Die Walzen laufen …' : `${game.stats.spins} Drehs an diesem Automaten`,
-      }),
-    ].filter(Boolean);
+    ];
   },
 
   seatDecor(seat, ctx) {
@@ -101,11 +125,21 @@ export default {
     const { state, meId, send } = ctx;
     const game = state.public;
     if (!state.youSeated) {
+      // Ohne Sitzplätze auf dem Filz braucht es hier einen richtigen Knopf.
+      const frei = state.seats.some((seat) => !seat.playerId);
       return [
         el('p.dock-note', {
-          text: 'Setz dich an den Automaten – hier spielt immer nur eine Person.',
+          text: frei
+            ? 'An diesem Automaten spielt immer nur eine Person.'
+            : 'Der Automat ist gerade besetzt – du kannst zusehen.',
         }),
-      ];
+        frei
+          ? el('button.action.action--raise', {
+              text: 'Platz nehmen',
+              onClick: () => send({ type: 'sit', code: state.code }),
+            })
+          : null,
+      ].filter(Boolean);
     }
 
     const balance = state.private?.balance ?? 0;
@@ -143,7 +177,7 @@ export default {
         el(
           'div.quick-row',
           {},
-          [min, 10, 25, max].map((value) =>
+          quickAmounts(min, max).map((value) =>
             el('button.quick', {
               text: value === max ? 'Max' : chips(value),
               onClick: () => {

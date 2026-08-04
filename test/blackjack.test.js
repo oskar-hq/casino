@@ -49,6 +49,10 @@ function makeTable(t, { stacks, config = {}, seed = 3 } = {}) {
     name: 'Testtisch',
     config: blackjack.normalizeConfig({
       ...blackjack.defaultConfig,
+      // Eigene Grenzen: Die Tests rechnen mit kleinen, gut lesbaren Betraegen
+      // und sollen nicht kaputtgehen, wenn die Tischtarife neu gesetzt werden.
+      minBet: 1,
+      maxBet: 1_000_000,
       turnMs: 400,
       betMs: 200,
       settleMs: 20,

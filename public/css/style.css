@@ -1066,21 +1066,153 @@ select.input {
   flex-wrap: wrap;
 }
 
-/* -------------------------------------------------------------- Slots */
+/* ------------------------------------------------- Automaten-Ansicht */
 
-.slot-machine {
-  position: relative;
-  padding: 12px;
-  background: linear-gradient(180deg, #1a1208, #0b0805);
-  border: 3px solid var(--gold-strong);
+/*
+ * Spiele mit `layout: 'machine'` bekommen statt des Filzovals einen dunklen
+ * Hintergrund ohne Sitzplätze – man steht vor einem Gerät, nicht an einem Tisch.
+ */
+.felt[data-layout='machine'] {
   border-radius: var(--radius-lg);
-  box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.6),
-    inset 0 0 22px rgba(232, 182, 76, 0.14);
+  border-color: #14100a;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #1d2b26 0%, #0b1512 55%, #060c0a 100%);
+  box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.6);
 }
+
+.felt[data-layout='machine'] .seat-ring {
+  display: none;
+}
+
+.felt[data-layout='machine'] .felt-center {
+  top: 50%;
+  width: min(96%, 26rem);
+}
+
+/* ------------------------------------------------------------- Gehäuse */
+
+.cabinet {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: linear-gradient(180deg, #2a1c10 0%, #191009 60%, #120b06 100%);
+  border: 3px solid var(--gold-strong);
+  border-radius: 20px;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.cabinet-marquee {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, #3a2712, #241708);
+  border: 1px solid rgba(232, 182, 76, 0.45);
+  border-radius: 12px;
+}
+
+.cabinet-title {
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: var(--gold);
+  text-shadow:
+    0 0 8px rgba(232, 182, 76, 0.8),
+    0 0 20px rgba(232, 182, 76, 0.35);
+}
+
+/* Die Lämpchen links und rechts blinken abwechselnd. */
+.cabinet-lamp {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--chip);
+  box-shadow: 0 0 8px var(--chip);
+  animation: lamp 1.4s ease-in-out infinite;
+}
+
+.cabinet-lamp:last-child {
+  animation-delay: 0.7s;
+}
+
+@keyframes lamp {
+  50% {
+    opacity: 0.25;
+    box-shadow: none;
+  }
+}
+
+.cabinet--busy .cabinet-lamp {
+  animation-duration: 0.45s;
+}
+
+.cabinet-window {
+  position: relative;
+  padding: 10px;
+  background: #0a0705;
+  border: 2px solid rgba(232, 182, 76, 0.35);
+  border-radius: 12px;
+  box-shadow: inset 0 3px 12px rgba(0, 0, 0, 0.8);
+}
+
+/* Kreditanzeige wie bei einem echten Gerät. */
+.cabinet-display {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.cabinet-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 8px;
+  background: #06100c;
+  border: 1px solid rgba(69, 209, 154, 0.25);
+  border-radius: 8px;
+}
+
+.cabinet-field-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(69, 209, 154, 0.6);
+}
+
+.cabinet-field-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--good);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 8px rgba(69, 209, 154, 0.5);
+}
+
+.cabinet-field-value.is-win {
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(232, 182, 76, 0.7);
+  animation: pop 0.35s ease;
+}
+
+.cabinet-foot {
+  text-align: center;
+}
+
+.cabinet-note {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+/* -------------------------------------------------------------- Slots */
 
 .slot-window {
   display: flex;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -1240,51 +1372,166 @@ select.input {
   line-height: 1.4;
 }
 
+/* ------------------------------------------------------------- Plinko */
+
+.plinko-board {
+  position: relative;
+  width: min(100%, 22rem);
+  aspect-ratio: 1 / 1.05;
+  margin-inline: auto;
+  padding-bottom: 26px;
+  background: linear-gradient(180deg, #101c17 0%, #0a1310 100%);
+  border: 2px solid rgba(232, 182, 76, 0.35);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 4px 18px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.plinko-pegs,
+.plinko-balls {
+  position: absolute;
+  inset: 0 0 26px 0;
+}
+
+.plinko-peg-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.plinko-balls {
+  pointer-events: none;
+}
+
+.plinko-ball {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff5d0, var(--gold));
+  box-shadow: 0 0 9px rgba(232, 182, 76, 0.85);
+}
+
+.plinko-ball.is-landed {
+  animation: ball-pop 0.4s ease forwards;
+}
+
+@keyframes ball-pop {
+  40% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* Die Fächer am Fuß des Bretts. */
+.plinko-slots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 1px;
+  padding: 0 1px 1px;
+}
+
+.plinko-slot {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  border-radius: 3px;
+  font-size: 0.54rem;
+  font-weight: 800;
+  color: #10100a;
+  transition:
+    transform 0.15s ease,
+    filter 0.15s ease;
+}
+
+.plinko-slot--cool {
+  background: #4a7f6a;
+}
+
+.plinko-slot--warm {
+  background: var(--gold-strong);
+}
+
+.plinko-slot--hot {
+  background: var(--chip);
+  color: #fff;
+}
+
+.plinko-slot.is-hit {
+  transform: translateY(-4px) scale(1.12);
+  filter: brightness(1.5);
+}
+
+.plinko-history {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.plinko-chip {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.plinko-chip--win {
+  background: rgba(69, 209, 154, 0.18);
+  color: var(--good);
+}
+
+.plinko-chip--mine {
+  outline: 1px solid rgba(232, 182, 76, 0.5);
+}
+
 /* ----------------------------------------------------------- Roulette */
 
 .wheel {
   position: relative;
   display: grid;
   place-items: center;
-  width: 132px;
-  height: 132px;
+  width: 168px;
+  height: 168px;
+  filter: drop-shadow(0 8px 22px rgba(0, 0, 0, 0.6));
 }
 
 .wheel-face {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    #16794f 0deg 9.73deg,
-    #1b232e 9.73deg 19.46deg, #cf2438 19.46deg 29.19deg,
-    #1b232e 29.19deg 38.92deg, #cf2438 38.92deg 48.65deg,
-    #1b232e 48.65deg 58.38deg, #cf2438 58.38deg 68.11deg,
-    #1b232e 68.11deg 77.84deg, #cf2438 77.84deg 87.57deg,
-    #1b232e 87.57deg 97.30deg, #cf2438 97.30deg 107.03deg,
-    #1b232e 107.03deg 116.76deg, #cf2438 116.76deg 126.49deg,
-    #1b232e 126.49deg 136.22deg, #cf2438 136.22deg 145.95deg,
-    #1b232e 145.95deg 155.68deg, #cf2438 155.68deg 165.41deg,
-    #1b232e 165.41deg 175.14deg, #cf2438 175.14deg 184.87deg,
-    #1b232e 184.87deg 194.60deg, #cf2438 194.60deg 204.32deg,
-    #1b232e 204.32deg 214.05deg, #cf2438 214.05deg 223.78deg,
-    #1b232e 223.78deg 233.51deg, #cf2438 233.51deg 243.24deg,
-    #1b232e 243.24deg 252.97deg, #cf2438 252.97deg 262.70deg,
-    #1b232e 262.70deg 272.43deg, #cf2438 272.43deg 282.16deg,
-    #1b232e 282.16deg 291.89deg, #cf2438 291.89deg 301.62deg,
-    #1b232e 301.62deg 311.35deg, #cf2438 311.35deg 321.08deg,
-    #1b232e 321.08deg 330.81deg, #cf2438 330.81deg 340.54deg,
-    #1b232e 340.54deg 350.27deg, #cf2438 350.27deg 360deg
-  );
-  border: 4px solid var(--gold-strong);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.55),
-    inset 0 0 18px rgba(0, 0, 0, 0.5);
 }
 
-/* Anlaufen und über die ganze Spieldauer wieder ausrollen. */
+.wheel-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pocket-label {
+  fill: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  font-family: inherit;
+}
+
+/*
+ * Der Kranz dreht auf ein bestimmtes Fach zu: --spin-to enthält fünf volle
+ * Umdrehungen plus den Winkel des Zielfachs. Am Ende steht genau die
+ * gefallene Zahl unter der Kugel.
+ */
 .wheel-face--spinning {
-  animation: wheel-spin var(--spin-ms, 5200ms) cubic-bezier(0.12, 0.72, 0.18, 1) forwards;
+  animation: wheel-spin var(--spin-ms, 5200ms) cubic-bezier(0.16, 0.62, 0.14, 1) forwards;
   will-change: transform;
 }
 
@@ -1293,56 +1540,69 @@ select.input {
     transform: rotate(0deg);
   }
   to {
-    transform: rotate(1980deg);
+    transform: rotate(var(--spin-to, 1800deg));
   }
 }
 
-/* Die Kugel läuft gegenläufig und fällt dabei nach innen. */
+/* Der Zeiger oben markiert das Fach, in dem die Kugel liegen bleibt. */
+.wheel-marker {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -7px;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 12px solid var(--gold);
+  z-index: 3;
+}
+
+/* Die Kugel läuft gegenläufig und kommt oben am Zeiger zur Ruhe. */
 .wheel-ball {
   position: absolute;
-  inset: 6px;
+  inset: 9px;
   border-radius: 50%;
-  opacity: 0;
+  z-index: 2;
+  transform: scale(0.72);
 }
 
 .wheel-ball--spinning {
-  opacity: 1;
-  animation: ball-spin var(--spin-ms, 5200ms) cubic-bezier(0.1, 0.66, 0.2, 1) forwards;
+  animation: ball-spin var(--spin-ms, 5200ms) cubic-bezier(0.14, 0.66, 0.16, 1) forwards;
   will-change: transform;
 }
 
 @keyframes ball-spin {
   from {
-    transform: rotate(0deg) scale(1);
+    transform: rotate(1080deg) scale(1);
   }
   to {
-    transform: rotate(-2520deg) scale(0.62);
+    transform: rotate(0deg) scale(0.72);
   }
 }
 
 .wheel-ball-dot {
   position: absolute;
-  top: -1px;
+  top: -2px;
   left: 50%;
-  width: 11px;
-  height: 11px;
-  margin-left: -5.5px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
   border-radius: 50%;
-  background: #fdfbf5;
-  box-shadow: 0 0 7px rgba(255, 255, 255, 0.75);
+  background: radial-gradient(circle at 35% 30%, #fff, #cfc9b8);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
 }
 
 /* Die Mitte dreht sich nicht mit – hier steht am Ende die Zahl. */
 .wheel-inner {
   position: relative;
+  z-index: 2;
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
-  background: #0b1a13;
-  border: 2px solid rgba(232, 182, 76, 0.5);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
 }
 
 .wheel-dots {

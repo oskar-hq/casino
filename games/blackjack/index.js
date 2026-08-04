@@ -18,15 +18,15 @@ export default {
 
   defaultConfig: {
     decks: 6,
-    minBet: 10,
-    maxBet: 500,
+    minBet: 500,
+    maxBet: 25_000,
     betMs: 15_000,
     turnMs: 30_000,
   },
 
   configFields: [
-    { key: 'minBet', label: 'Mindesteinsatz', type: 'int', min: 1, max: 200, step: 1, suffix: 'Chips' },
-    { key: 'maxBet', label: 'Höchsteinsatz', type: 'int', min: 10, max: 5000, step: 10, suffix: 'Chips' },
+    { key: 'minBet', label: 'Mindesteinsatz', type: 'int', min: 50, max: 10_000, step: 50, suffix: 'Chips' },
+    { key: 'maxBet', label: 'Höchsteinsatz', type: 'int', min: 500, max: 250_000, step: 500, suffix: 'Chips' },
     { key: 'decks', label: 'Decks im Schuh', type: 'int', min: 1, max: 8, step: 1 },
     {
       key: 'betMs',

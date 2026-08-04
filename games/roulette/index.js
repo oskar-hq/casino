@@ -18,14 +18,14 @@ export default {
   supportsBots: true,
 
   defaultConfig: {
-    minBet: 5,
-    maxBet: 500,
+    minBet: 500,
+    maxBet: 25_000,
     betMs: 25_000,
   },
 
   configFields: [
-    { key: 'minBet', label: 'Mindesteinsatz', type: 'int', min: 1, max: 100, step: 1, suffix: 'Chips' },
-    { key: 'maxBet', label: 'Höchsteinsatz', type: 'int', min: 10, max: 5000, step: 10, suffix: 'Chips' },
+    { key: 'minBet', label: 'Mindesteinsatz', type: 'int', min: 50, max: 10_000, step: 50, suffix: 'Chips' },
+    { key: 'maxBet', label: 'Höchsteinsatz', type: 'int', min: 500, max: 250_000, step: 500, suffix: 'Chips' },
     {
       key: 'betMs',
       label: 'Zeit zum Setzen',

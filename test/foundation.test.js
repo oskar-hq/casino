@@ -396,6 +396,118 @@ test('Casino: Reset-Knopf setzt alle auf das Startguthaben', () => {
   assert.equal(casino.balanceOf(ben.id), 1000);
 });
 
+// ------------------------------------------------- Tägliche Auffüllung
+
+/**
+ * Wer pleite ist, soll am nächsten Tag weiterspielen können, ohne sich einen
+ * neuen Namen ausdenken zu müssen. Wer aber im Plus steht, behält seinen
+ * Gewinn – sonst wäre gutes Spiel wertlos.
+ */
+test('Casino: nach Ablauf der Frist wird ein leeres Konto aufgefüllt', () => {
+  const { casino, db } = makeCasino({ startChips: 100_000, topUpAfterMs: 1000 });
+  const anna = casino.enter({ name: 'Anna' });
+  casino.debit(anna.id, 99_000, 'test');
+  assert.equal(casino.balanceOf(anna.id), 1000);
+
+  // Frist noch nicht um – es bleibt beim Reststand.
+  anna.online = false;
+  assert.equal(casino.enter({ name: 'Anna' }).chips, 1000);
+
+  // Frist künstlich verstreichen lassen.
+  db.topUp(anna.id, 1000, Date.now() - 5000);
+  anna.online = false;
+  assert.equal(casino.enter({ name: 'Anna' }).chips, 100_000, 'jetzt gibt es wieder Startgeld');
+});
+
+test('Casino: wer im Plus ist, behält sein Geld', () => {
+  const { casino, db } = makeCasino({ startChips: 100_000, topUpAfterMs: 1000 });
+  const anna = casino.enter({ name: 'Anna' });
+  casino.credit(anna.id, 50_000, 'test');
+  db.topUp(anna.id, 150_000, Date.now() - 5000); // Frist ist längst um
+
+  anna.online = false;
+  const wieder = casino.enter({ name: 'Anna' });
+  assert.equal(wieder.chips, 150_000, 'ein Gewinn wird nicht wegrationalisiert');
+});
+
+test('Casino: genau auf dem Startguthaben wird nicht aufgefüllt', () => {
+  const { casino, db } = makeCasino({ startChips: 100_000, topUpAfterMs: 1000 });
+  const anna = casino.enter({ name: 'Anna' });
+  db.topUp(anna.id, 100_000, Date.now() - 5000);
+
+  anna.online = false;
+  assert.equal(casino.enter({ name: 'Anna' }).chips, 100_000);
+});
+
+test('Casino: höchstens eine Auffüllung pro Frist', () => {
+  const { casino, db } = makeCasino({ startChips: 100_000, topUpAfterMs: 1000 });
+  const anna = casino.enter({ name: 'Anna' });
+  db.topUp(anna.id, 500, Date.now() - 5000);
+
+  anna.online = false;
+  assert.equal(casino.enter({ name: 'Anna' }).chips, 100_000);
+
+  // Gleich wieder alles verspielt – jetzt gibt es nichts mehr dazu.
+  casino.debit(anna.id, 100_000, 'test');
+  anna.online = false;
+  assert.equal(casino.enter({ name: 'Anna' }).chips, 0, 'erst morgen wieder');
+});
+
+test('Casino: der Reset des Hosts setzt die Frist neu', () => {
+  const { casino, db } = makeCasino({ startChips: 100_000, topUpAfterMs: 60_000 });
+  const anna = casino.enter({ name: 'Anna' });
+  db.topUp(anna.id, 100, Date.now() - 120_000); // Frist wäre abgelaufen
+
+  casino.resetAllChips(anna.id);
+  assert.equal(casino.balanceOf(anna.id), 100_000);
+  const row = db.findPlayerById(anna.id);
+  assert.ok(Date.now() - row.last_topup < 5000, 'der Reset zählt als Auffüllung');
+});
+
+test('Casino: die Auffüllung lässt sich abschalten', () => {
+  const { casino, db } = makeCasino({ startChips: 100_000, topUpAfterMs: 0 });
+  const anna = casino.enter({ name: 'Anna' });
+  casino.debit(anna.id, 99_999, 'test');
+  db.topUp(anna.id, 1, 0);
+
+  anna.online = false;
+  assert.equal(casino.enter({ name: 'Anna' }).chips, 1, 'ohne Frist keine Auffüllung');
+});
+
+test('Casino: auch wer die ganze Zeit da ist, wird aufgefüllt', () => {
+  const { casino, db } = makeCasino({ startChips: 100_000, topUpAfterMs: 1000 });
+  const anna = casino.enter({ name: 'Anna' });
+  anna.online = true;
+  casino.debit(anna.id, 100_000, 'test');
+  db.topUp(anna.id, 0, Date.now() - 5000);
+
+  assert.equal(casino.sweepTopUps(), 1, 'der Rundlauf greift auch ohne Neueintritt');
+  assert.equal(casino.balanceOf(anna.id), 100_000);
+});
+
+test('Casino: eine alte Datenbank bekommt die neue Spalte nachgerüstet', () => {
+  const db = new CasinoDb(':memory:');
+  // Zustand vor der Erweiterung nachstellen.
+  db.db.exec('DROP TABLE players');
+  db.db.exec(`CREATE TABLE players (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, name_key TEXT NOT NULL UNIQUE,
+    token TEXT NOT NULL, chips INTEGER NOT NULL,
+    created_at INTEGER NOT NULL, last_seen INTEGER NOT NULL)`);
+  db.db.exec(
+    `INSERT INTO players VALUES ('alt', 'Alt', 'alt', 'tok', 42, 0, 0)`,
+  );
+
+  const migriert = new CasinoDb(':memory:');
+  migriert.db = db.db;
+  migriert.migrate();
+
+  const spalten = db.db.prepare('PRAGMA table_info(players)').all().map((row) => row.name);
+  assert.ok(spalten.includes('last_topup'), 'die Spalte wird ergänzt');
+  const row = db.db.prepare('SELECT * FROM players WHERE id = ?').get('alt');
+  assert.equal(row.chips, 42, 'bestehende Daten bleiben unangetastet');
+  assert.equal(row.last_topup, 0);
+});
+
 test('Casino: ein Spieler sitzt an höchstens einem Tisch', () => {
   const { casino } = makeCasino();
   const anna = casino.enter({ name: 'Anna' });

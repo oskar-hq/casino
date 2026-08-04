@@ -17,10 +17,11 @@
 import baccarat from './baccarat.js';
 import blackjack from './blackjack.js';
 import holdem from './holdem.js';
+import plinko from './plinko.js';
 import roulette from './roulette.js';
 import slots from './slots.js';
 
-const VIEWS = new Map([holdem, blackjack, slots, roulette, baccarat].map((view) => [view.id, view]));
+const VIEWS = new Map([holdem, blackjack, slots, plinko, roulette, baccarat].map((view) => [view.id, view]));
 
 /** Fällt auf ein leeres Modul zurück, falls der Server ein unbekanntes Spiel meldet. */
 const FALLBACK = { id: 'unknown' };

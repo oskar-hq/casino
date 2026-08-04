@@ -2,7 +2,7 @@
 
 Ein selbstgehostetes Web-Casino zum Spaß. Man betritt mit einem Anzeigenamen
 den Floor, sieht die offenen Tische, setzt sich dazu, wo man will – Poker,
-Blackjack, Slots, Roulette oder Baccarat – und nimmt sein Guthaben überall hin
+Blackjack, Slots, Plinko, Roulette oder Baccarat – und nimmt sein Guthaben überall hin
 mit. Spielbar mit Freunden und gegen Bots.
 
 > **Reines Spielgeld.** Es gibt keinen Kauf von Chips, keine Auszahlung und
@@ -16,6 +16,7 @@ mit. Spielbar mit Freunden und gegen Bots.
 | **Texas Hold'em** | bis 9 | No-Limit, feste Blinds, Side-Pots, Showdown |
 | **Blackjack** | bis 7 | 6-Deck-Schuh, Dealer steht auf Soft 17, Blackjack 3:2 |
 | **Slots** | 1 | 3 Walzen, feste Paytable, ~95 % Auszahlungsquote |
+| **Plinko** | bis 5 | Kugel durch 12 Nagelreihen, drei Risikostufen, ~97 % |
 | **Roulette** | bis 8 | Europäisch (eine Null), volles Tableau |
 | **Baccarat** | bis 8 | Punto Banco, 5 % Kommission auf Banker |
 
@@ -50,7 +51,7 @@ npm test
 
 ## Wie man spielt
 
-1. **Namen eingeben** → man betritt den Floor und bekommt 1000 Chips.
+1. **Namen eingeben** → man betritt den Floor und bekommt 100.000 Chips.
    Derselbe Name führt später wieder auf dasselbe Guthaben.
 2. **Tisch eröffnen oder dazusetzen.** Jeder Tisch hat einen vierstelligen
    Code; wer den Code hat, kommt über „Beitreten“ direkt an den Tisch
@@ -88,8 +89,16 @@ mit dem gleichen Stand zurück.
 
 Ein paar Regeln, die bewusst so sind:
 
-- **Kein Rebuy.** Wer bei 0 steht, kann nicht mehr setzen und sitzt aus.
-  Nur der Reset-Knopf des Hosts füllt wieder auf.
+- **Kein Rebuy mitten in der Session.** Wer bei 0 steht, kann nicht mehr
+  setzen und sitzt aus. Wieder aufgefüllt wird nur über den Reset-Knopf des
+  Hosts – oder automatisch nach 24 Stunden (siehe unten).
+- **Tagesbonus nach 24 Stunden.** Wer unter dem Startguthaben liegt, wird
+  höchstens einmal am Tag automatisch wieder auf 100.000 gesetzt – damit man
+  am nächsten Tag weiterspielen kann, ohne sich einen neuen Namen auszudenken.
+  Wer **über** dem Startguthaben liegt, behält seinen Gewinn; gutes Spiel soll
+  ja etwas wert sein. Die Frist beginnt erst mit der Auffüllung neu, ein
+  Reicher wird also nicht alle 24 Stunden heruntergesetzt.
+  Abschaltbar über `CASINO_TOPUP_AFTER_MS=0`.
 - **Ein Tisch pro Person.** Man kann überall zuschauen, aber nur an einem
   Tisch *sitzen* – sonst ließe sich dasselbe Guthaben zweimal setzen.
 - **Verdeckte Karten sind wirklich verdeckt.** Beim Poker verlassen fremde
@@ -112,7 +121,8 @@ Alles ist optional – ohne Angabe gelten die Vorgaben.
 | `PORT` | `3000` | Port für Frontend **und** WebSocket |
 | `HOST` | `0.0.0.0` | Bind-Adresse |
 | `CASINO_NAME` | `Chip Palace` | Name im Kopf der Seite |
-| `CASINO_START_CHIPS` | `1000` | Startguthaben und Ziel des Reset-Knopfes |
+| `CASINO_START_CHIPS` | `100000` | Startguthaben und Ziel des Reset-Knopfes |
+| `CASINO_TOPUP_AFTER_MS` | `86400000` | Frist der automatischen Auffüllung, `0` schaltet sie ab |
 | `CASINO_TURN_MS` | `30000` | Bedenkzeit pro Zug, danach Auto-Fold/Check |
 | `CASINO_BOT_MS` | `1100` | Bedenkzeit eines Bots |
 | `CASINO_HOST_PIN` | – | Wer den PIN kennt, wird Host. Leer = erster Gast |
@@ -128,16 +138,17 @@ lassen sich dort weiterhin abweichend einstellen.
 
 | Variable | Vorgabe |
 | --- | --- |
-| `HOLDEM_SMALL_BLIND` / `HOLDEM_BIG_BLIND` | `5` / `10` |
+| `HOLDEM_SMALL_BLIND` / `HOLDEM_BIG_BLIND` | `500` / `1000` |
 | `HOLDEM_TURN_MS` | `30000` |
 | `BLACKJACK_DECKS` | `6` |
-| `BLACKJACK_MIN_BET` / `BLACKJACK_MAX_BET` | `10` / `500` |
+| `BLACKJACK_MIN_BET` / `BLACKJACK_MAX_BET` | `500` / `25000` |
 | `BLACKJACK_BET_MS` | `15000` |
-| `SLOTS_MIN_BET` / `SLOTS_MAX_BET` | `5` / `100` |
-| `ROULETTE_MIN_BET` / `ROULETTE_MAX_BET` | `5` / `500` |
+| `SLOTS_MIN_BET` / `SLOTS_MAX_BET` | `500` / `10000` |
+| `ROULETTE_MIN_BET` / `ROULETTE_MAX_BET` | `500` / `25000` |
 | `ROULETTE_BET_MS` | `25000` |
+| `PLINKO_MIN_BET` / `PLINKO_MAX_BET` | `500` / `25000` |
 | `BACCARAT_DECKS` | `8` |
-| `BACCARAT_MIN_BET` / `BACCARAT_MAX_BET` | `10` / `1000` |
+| `BACCARAT_MIN_BET` / `BACCARAT_MAX_BET` | `1000` / `50000` |
 | `BACCARAT_BET_MS` | `20000` |
 
 ## Betrieb
@@ -196,12 +207,19 @@ Client rendert nur, was er geschickt bekommt. Konkret:
 - **Zufall** kommt aus `node:crypto` (`core/rng.js`), nie aus dem Browser.
 - **Verdeckte Informationen** stehen ausschließlich in `privateState(playerId)`
   und werden pro Empfänger einzeln erzeugt. `publicState()` enthält sie nicht –
-  fremde Hole Cards, die Hole Card des Dealers, die Roulettezahl vor dem Dreh
-  und das Slots-Ergebnis während der Animation verlassen den Server nicht.
-  Das gilt auch für die Animationsereignisse: Das Roulette meldet nur, *dass*
-  gedreht wird und wie lange. Die Kugelbahn im Browser ist reine Optik und
-  läuft bewusst nicht auf die Zahl zu – sonst wäre sie Sekunden vorher
-  auslesbar.
+  fremde Hole Cards und die Hole Card des Dealers verlassen den Server nie.
+- **Ergebnisse, die schon feststehen, gehen mit der Animation raus.** Beim
+  Roulette fährt die gefallene Zahl mit dem Dreh-Ereignis mit, bei Plinko der
+  komplette Weg der Kugel. Nur so kann die Animation *wirklich* dort landen,
+  wo abgerechnet wird – eine Kugel, die woanders liegen bleibt als das
+  Ergebnis, wäre schlicht gelogen.
+
+  Das ist kein Leck, sondern eine bewusste Abwägung: In dem Moment, in dem das
+  Ergebnis herausgeht, ist das Setzfenster geschlossen bzw. der Einsatz längst
+  abgebucht. Der Server weist ab da jede Wette ab (`test/roulette.test.js`
+  nagelt genau das fest). Wer früher hinsieht, verdirbt sich höchstens selbst
+  die Spannung – einen Vorteil hat er nicht. Im **öffentlichen Zustand** steht
+  die Zahl weiterhin erst nach der Abrechnung, Zuschauer sehen also nichts.
 - **Jede Aktion** wird serverseitig geprüft: Ist der Spieler am Zug, ist der
   Zug regelkonform, reicht das Guthaben. Der Client schickt nur Absichten.
 - **Einsätze** werden sofort vom Wallet abgebucht. Es gibt keinen Weg, Chips

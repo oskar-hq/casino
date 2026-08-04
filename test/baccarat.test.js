@@ -57,6 +57,10 @@ function makeTable(t, { stacks = { a: 1000 }, config = {}, seed = 9 } = {}) {
     name: 'Punto Banco',
     config: baccarat.normalizeConfig({
       ...baccarat.defaultConfig,
+      // Eigene Grenzen: Die Tests rechnen mit kleinen, gut lesbaren Betraegen
+      // und sollen nicht kaputtgehen, wenn die Tischtarife neu gesetzt werden.
+      minBet: 1,
+      maxBet: 1_000_000,
       betMs: 200,
       dealMs: 10,
       resultMs: 20,

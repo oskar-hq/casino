@@ -218,11 +218,25 @@ export class RouletteEngine extends GameEngine {
     this.phase = 'spinning';
     this.currentDeadline = null;
 
-    // Die Zahl steht jetzt fest, bleibt aber bis zur Abrechnung auf dem Server.
-    // Das Ereignis meldet nur, *dass* gedreht wird und wie lange – sonst
-    // könnte ein Client die Zahl Sekunden vor allen anderen auslesen.
     this.winningNumber = this.ctx.rng.int(37);
-    this.ctx.emit({ kind: 'spin', duration: this.timings.spin });
+
+    /*
+     * Die gefallene Zahl geht mit dem Dreh-Ereignis an die Clients, damit die
+     * Kugel im Browser wirklich auf diesem Fach landen kann – eine Animation,
+     * die woanders stehen bleibt als das Ergebnis, wäre schlicht falsch.
+     *
+     * Das ist unbedenklich: Das Setzfenster ist in diesem Moment bereits
+     * geschlossen (`phase` steht auf 'spinning'), `placeBet` weist ab jetzt
+     * jede Wette ab. Wer die Zahl früher sieht, kann damit nichts anfangen –
+     * er verdirbt sich höchstens selbst die Spannung. Im öffentlichen Zustand
+     * steht sie weiterhin erst nach der Abrechnung.
+     */
+    this.ctx.emit({
+      kind: 'spin',
+      duration: this.timings.spin,
+      number: this.winningNumber,
+      pocket: WHEEL_ORDER.indexOf(this.winningNumber),
+    });
 
     this.ctx.later(() => {
       this.settle();

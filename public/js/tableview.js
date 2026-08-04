@@ -69,6 +69,8 @@ export function renderTable(ctx) {
 
   $('table-title').textContent = state.name;
   $('table-code').textContent = state.code;
+  // Automaten sehen anders aus als Tische: kein Filzoval, keine Sitzplätze.
+  $('felt').dataset.layout = view.layout ?? 'table';
   // Uhrenabgleich: Der Server schickt seine Zeit mit, der Client rechnet um.
   clockOffset = state.serverTime - Date.now();
 

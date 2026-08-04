@@ -13,20 +13,25 @@ services:
       # ---- Floor ----------------------------------------------------------
       CASINO_NAME: ${CASINO_NAME:-Chip Palace}
       # Startguthaben jedes Gastes und Zielwert des Reset-Knopfes.
-      CASINO_START_CHIPS: ${CASINO_START_CHIPS:-1000}
+      CASINO_START_CHIPS: ${CASINO_START_CHIPS:-100000}
       # Bedenkzeit pro Zug in ms; danach Auto-Fold/Check.
       CASINO_TURN_MS: ${CASINO_TURN_MS:-30000}
       # Bedenkzeit eines Bots, damit man seine Züge mitlesen kann.
       CASINO_BOT_MS: ${CASINO_BOT_MS:-1100}
+      # Wer unter dem Startguthaben liegt, wird höchstens einmal pro Frist
+      # automatisch aufgefüllt (Vorgabe: 24 Stunden). 0 schaltet das ab.
+      CASINO_TOPUP_AFTER_MS: ${CASINO_TOPUP_AFTER_MS:-86400000}
       # Wer diesen PIN kennt, kann Host werden. Leer = der erste Gast wird Host.
       CASINO_HOST_PIN: ${CASINO_HOST_PIN:-}
       CASINO_DB: /data/casino.db
 
       # ---- Spiele (optional; sonst gelten die Vorgaben der Module) ---------
-      # HOLDEM_SMALL_BLIND: 5
-      # HOLDEM_BIG_BLIND: 10
+      # HOLDEM_SMALL_BLIND: 500
+      # HOLDEM_BIG_BLIND: 1000
       # BLACKJACK_DECKS: 6
-      # BLACKJACK_MIN_BET: 10
+      # BLACKJACK_MIN_BET: 500
+      # PLINKO_MIN_BET: 500
+      # PLINKO_RISK: medium
       # ROULETTE_BET_MS: 25000
       # BACCARAT_DECKS: 8
     ports:

@@ -18,14 +18,14 @@ export default {
   solo: true,
 
   defaultConfig: {
-    minBet: 5,
-    maxBet: 100,
+    minBet: 500,
+    maxBet: 10_000,
     spinMs: 1400,
   },
 
   configFields: [
-    { key: 'minBet', label: 'Mindesteinsatz', type: 'int', min: 1, max: 100, step: 1, suffix: 'Chips' },
-    { key: 'maxBet', label: 'Höchsteinsatz', type: 'int', min: 5, max: 1000, step: 5, suffix: 'Chips' },
+    { key: 'minBet', label: 'Mindesteinsatz', type: 'int', min: 50, max: 5000, step: 50, suffix: 'Chips' },
+    { key: 'maxBet', label: 'Höchsteinsatz', type: 'int', min: 500, max: 100_000, step: 500, suffix: 'Chips' },
   ],
 
   normalizeConfig(config) {

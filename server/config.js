@@ -27,7 +27,13 @@ export const config = {
   casinoName: env.CASINO_NAME ?? 'Chip Palace',
 
   /** Startguthaben jedes Spielers und Zielwert des Reset-Knopfes. */
-  startChips: Math.max(1, int(env.CASINO_START_CHIPS, 1000)),
+  startChips: Math.max(1, int(env.CASINO_START_CHIPS, 100_000)),
+
+  /**
+   * Wer unter dem Startguthaben liegt, wird höchstens einmal in diesem
+   * Zeitraum automatisch wieder aufgefüllt. 0 schaltet das ab.
+   */
+  topUpAfterMs: Math.max(0, int(env.CASINO_TOPUP_AFTER_MS, 24 * 60 * 60 * 1000)),
 
   /** Bedenkzeit pro Zug in ms; danach Auto-Fold/Check. */
   turnMs: Math.max(5000, int(env.CASINO_TURN_MS, 30000)),
@@ -70,6 +76,11 @@ export const config = {
     slots: {
       minBet: int(env.SLOTS_MIN_BET, undefined),
       maxBet: int(env.SLOTS_MAX_BET, undefined),
+    },
+    plinko: {
+      minBet: int(env.PLINKO_MIN_BET, undefined),
+      maxBet: int(env.PLINKO_MAX_BET, undefined),
+      risk: env.PLINKO_RISK || undefined,
     },
     roulette: {
       minBet: int(env.ROULETTE_MIN_BET, undefined),

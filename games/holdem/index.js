@@ -31,14 +31,14 @@ export default {
   supportsBots: true,
 
   defaultConfig: {
-    smallBlind: 5,
-    bigBlind: 10,
+    smallBlind: 500,
+    bigBlind: 1000,
     turnMs: 30_000,
   },
 
   configFields: [
-    { key: 'smallBlind', label: 'Small Blind', type: 'int', min: 1, max: 500, step: 1, suffix: 'Chips' },
-    { key: 'bigBlind', label: 'Big Blind', type: 'int', min: 2, max: 1000, step: 1, suffix: 'Chips' },
+    { key: 'smallBlind', label: 'Small Blind', type: 'int', min: 25, max: 25000, step: 25, suffix: 'Chips' },
+    { key: 'bigBlind', label: 'Big Blind', type: 'int', min: 50, max: 50000, step: 50, suffix: 'Chips' },
     {
       key: 'turnMs',
       label: 'Bedenkzeit',

@@ -117,6 +117,7 @@ export class Casino {
     if (playerId && token) {
       const stored = this.db.findPlayerById(playerId);
       if (stored && stored.token === token) {
+        this.maybeTopUp(stored);
         const player = this.hydrate(stored);
         if (name) {
           const wanted = sanitizeName(name);
@@ -139,6 +140,7 @@ export class Casino {
           'Unter diesem Namen ist gerade jemand im Casino. Nimm einen anderen.',
         );
       }
+      this.maybeTopUp(existing);
       const player = this.hydrate(existing);
       player.name = cleanName;
       this.db.renamePlayer(player.id, cleanName, key);
@@ -157,6 +159,41 @@ export class Casino {
     this.log(`+ ${cleanName} betritt das Casino (${player.chips} Chips)`);
     if (!this.hostId && !this.config.hostPin) this.setHost(player.id);
     return player;
+  }
+
+  /**
+   * Automatische Auffüllung nach Ablauf der Frist (Standard: 24 Stunden).
+   *
+   * Nur wer **unter** dem Startguthaben liegt, wird aufgefüllt – wer gut
+   * gespielt hat, behält seinen Gewinn. Die Frist beginnt erst mit der
+   * Auffüllung neu, damit man nicht alle 24 Stunden zwangsweise auf den
+   * Startwert zurückgesetzt wird.
+   *
+   * @returns {number|null} der aufgefüllte Betrag, sonst `null`
+   */
+  maybeTopUp(row) {
+    const frist = this.config.topUpAfterMs;
+    if (!frist) return null;
+    if (row.chips >= this.config.startChips) return null;
+    if (Date.now() - (row.last_topup ?? 0) < frist) return null;
+
+    const betrag = this.config.startChips;
+    this.db.topUp(row.id, betrag);
+    const player = this.players.get(row.id);
+    if (player) player.chips = betrag;
+    row.chips = betrag;
+    row.last_topup = Date.now();
+    this.log(`↑ ${row.name} wurde auf ${betrag} Chips aufgefüllt (Tagesbonus)`);
+    return betrag;
+  }
+
+  /** Wann wäre die nächste automatische Auffüllung fällig? */
+  topUpDueAt(playerId) {
+    const frist = this.config.topUpAfterMs;
+    if (!frist) return null;
+    const row = this.db.findPlayerById(playerId);
+    if (!row) return null;
+    return (row.last_topup ?? 0) + frist;
   }
 
   /** DB-Zeile → Laufzeitobjekt (und in die Map legen). */
@@ -586,8 +623,24 @@ export class Casino {
 
   // ----------------------------------------------------------- Aufräumen
 
+  /**
+   * Auffüllung auch für Gäste, die schon eine Weile da sind – sonst müsste
+   * man das Casino verlassen und neu betreten, damit der Tagesbonus greift.
+   */
+  sweepTopUps() {
+    let aufgefüllt = 0;
+    for (const player of this.players.values()) {
+      if (!player.online) continue;
+      const row = this.db.findPlayerById(player.id);
+      if (row && this.maybeTopUp(row) !== null) aufgefüllt += 1;
+    }
+    if (aufgefüllt) this.notify('floor');
+    return aufgefüllt;
+  }
+
   /** Leere Tische abräumen, die lange niemand mehr besucht hat. */
   sweep(now = Date.now()) {
+    this.sweepTopUps();
     for (const [code, table] of this.tables) {
       const idle = now - table.lastActivity;
       if (table.humanCount === 0 && table.spectators.size === 0 && idle > this.config.tableTtlMs) {

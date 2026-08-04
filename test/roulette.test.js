@@ -47,6 +47,10 @@ function makeTable(t, { stacks = { a: 1000 }, config = {}, seed = 5 } = {}) {
     name: 'Kessel',
     config: roulette.normalizeConfig({
       ...roulette.defaultConfig,
+      // Eigene Grenzen: Die Tests rechnen mit kleinen, gut lesbaren Betraegen
+      // und sollen nicht kaputtgehen, wenn die Tischtarife neu gesetzt werden.
+      minBet: 1,
+      maxBet: 1_000_000,
       betMs: 200,
       spinMs: 20,
       resultMs: 20,
@@ -464,7 +468,48 @@ test('Roulette: „bereit“ geht nur im Setzfenster und nur im Sitzen', (t) => 
 
 // ------------------------------------------------------ Geheimhaltung II
 
-test('Roulette: auch das Dreh-Ereignis verrät die Zahl nicht', (t) => {
+/**
+ * Die Zahl geht bewusst mit dem Dreh-Ereignis raus, damit die Kugel im
+ * Browser wirklich auf dem richtigen Fach landen kann. Unbedenklich ist das,
+ * weil in diesem Moment nichts mehr gesetzt werden kann – genau das wird
+ * hier festgenagelt.
+ */
+test('Roulette: mit dem Dreh kommt das Zielfach, aber es geht nichts mehr', (t) => {
+  const { table, engine, balances } = makeTable(t, {
+    stacks: { a: 1000 },
+    config: { betMs: 60_000, spinMs: 5000 },
+  });
+  engine.tick();
+  engine.act('a', { move: 'bet', betType: 'red', arg: null, amount: 10 });
+  table.takeEvents();
+
+  engine.act('a', { move: 'ready' });
+  const spin = table.takeEvents().find((event) => event.kind === 'spin');
+  assert.ok(spin, 'ein Dreh-Ereignis muss kommen');
+  assert.equal(spin.number, engine.winningNumber, 'die Zahl fährt mit');
+  assert.equal(
+    WHEEL_ORDER[spin.pocket],
+    engine.winningNumber,
+    'und das Fach passt dazu – sonst liefe die Animation woandershin',
+  );
+
+  // Der eigentliche Schutz: Ab jetzt nimmt der Tisch nichts mehr an.
+  const vorher = balances.get('a');
+  assert.throws(
+    () => engine.act('a', { move: 'bet', betType: 'straight', arg: spin.number, amount: 10 }),
+    /rien ne va plus/,
+    'wer die Zahl kennt, kann trotzdem nicht mehr darauf setzen',
+  );
+  assert.throws(() => engine.act('a', { move: 'undo' }), /nichts mehr zurück/);
+  assert.equal(balances.get('a'), vorher, 'und sein Guthaben ändert sich nicht');
+
+  // Öffentlich steht die Zahl weiterhin erst nach der Abrechnung.
+  assert.equal(table.stateFor('a').public.number, null);
+  engine.settle();
+  assert.equal(table.stateFor('a').public.number, engine.winningNumber);
+});
+
+test('Roulette: der öffentliche Zustand schweigt bis zur Abrechnung', (t) => {
   const { table, engine } = makeTable(t, {
     stacks: { a: 1000 },
     config: { betMs: 60_000, spinMs: 5000 },
@@ -473,19 +518,16 @@ test('Roulette: auch das Dreh-Ereignis verrät die Zahl nicht', (t) => {
   engine.act('a', { move: 'bet', betType: 'red', arg: null, amount: 10 });
   table.takeEvents(); // Puffer leeren
 
-  engine.act('a', { move: 'ready' });
-  const events = table.takeEvents();
-  const spin = events.find((event) => event.kind === 'spin');
-  assert.ok(spin, 'ein Dreh-Ereignis muss kommen');
-  assert.deepEqual(
-    Object.keys(spin).sort(),
-    ['duration', 'kind'],
-    'es meldet nur, dass gedreht wird und wie lange',
-  );
-
-  // Auch der Zustand während der Drehung schweigt noch.
+  // Während des Setzens gibt es noch gar keine Zahl.
   assert.equal(table.stateFor('a').public.number, null);
+  assert.equal(engine.winningNumber, null);
+
+  engine.act('a', { move: 'ready' });
+  // Während der Drehung steht sie serverseitig fest, im öffentlichen
+  // Zustand aber weiterhin nicht – Zuschauer sehen sie erst mit dem Ergebnis.
   assert.ok(engine.winningNumber !== null, 'serverseitig steht sie längst fest');
+  assert.equal(table.stateFor('a').public.number, null);
+  assert.equal(table.stateFor('zuschauer').public.number, null);
 });
 
 // ------------------------------------------------------------------- Bots

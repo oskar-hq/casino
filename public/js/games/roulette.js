@@ -6,7 +6,7 @@
  * Zwischen zwei Zahlen tippen (Cheval) geht über die schmalen Stege.
  */
 
-import { chips, el, toast } from '../dom.js';
+import { chips, el, quickAmounts, toast } from '../dom.js';
 import { countdown } from '../tableview.js';
 
 const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
@@ -14,6 +14,8 @@ const colorOf = (n) => (n === 0 ? 'green' : RED.has(n) ? 'red' : 'black');
 
 /** Der gewählte Chipwert, mit dem getippt wird. */
 let chipValue = null;
+/** Auf welches Fach die laufende Drehung zuläuft: { round, pocket }. */
+let spinTarget = null;
 
 export default {
   id: 'roulette',
@@ -22,7 +24,19 @@ export default {
     const game = ctx.state.public;
     if (!game) return [];
 
-    const nodes = [wheel(game), history(game)];
+    // Das Zielfach kommt mit dem Dreh-Ereignis und gilt für diese Runde.
+    // Später steht es ohnehin in der gefallenen Zahl – so stimmt das Rad auch
+    // dann, wenn man mitten in der Auswertung dazukommt.
+    const spinEvent = (ctx.events ?? []).find((event) => event.kind === 'spin');
+    if (spinEvent) spinTarget = { round: game.roundNumber, pocket: spinEvent.pocket };
+    const pocket =
+      game.number !== null && game.number !== undefined
+        ? WHEEL_ORDER.indexOf(game.number)
+        : spinTarget?.round === game.roundNumber
+          ? spinTarget.pocket
+          : null;
+
+    const nodes = [wheel(game, pocket), history(game)];
 
     if (game.phase === 'betting') {
       nodes.push(
@@ -83,7 +97,7 @@ export default {
     const youReady = state.private?.youReady ?? false;
     const ready = game.ready ?? { ready: 0, total: 1 };
     const act = (action) => send({ type: 'action', code: state.code, action });
-    const values = chipValues(game.minBet, game.maxBet);
+    const values = quickAmounts(game.minBet, game.maxBet);
     if (chipValue === null || !values.includes(chipValue)) chipValue = values[0];
 
     return [
@@ -216,28 +230,88 @@ export default {
 
 // ------------------------------------------------------------------ Rad
 
+/** Die Fächer des echten europäischen Rades, im Uhrzeigersinn ab der Null. */
+const WHEEL_ORDER = [
+  0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14,
+  31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26,
+];
+const POCKET_ANGLE = 360 / WHEEL_ORDER.length;
+
 /**
- * Das Rad. Beim Drehen beschleunigt der Kranz und bremst über die volle
- * Spieldauer wieder ab, die Kugel läuft gegenläufig und wandert dabei nach
- * innen. Die Zahl erscheint erst am Ende – der Client kennt sie vorher nicht,
- * die Animation ist also reine Optik und verrät nichts.
+ * Zeichnet den Kranz einmal als SVG: 37 Sektoren in der echten Reihenfolge,
+ * jeder mit seiner Zahl. Fach 0 liegt oben (12 Uhr), von dort geht es im
+ * Uhrzeigersinn weiter.
  */
-function wheel(game) {
+function wheelSvg() {
+  const r = 96;
+  const sektoren = WHEEL_ORDER.map((zahl, index) => {
+    const von = index * POCKET_ANGLE - POCKET_ANGLE / 2 - 90;
+    const bis = von + POCKET_ANGLE;
+    const [x1, y1] = polar(100, 100, r, von);
+    const [x2, y2] = polar(100, 100, r, bis);
+    const farbe = { green: '#16794f', red: '#cf2438', black: '#171d26' }[colorOf(zahl)];
+    const [tx, ty] = polar(100, 100, r - 13, von + POCKET_ANGLE / 2);
+    const drehung = index * POCKET_ANGLE;
+    return `
+      <path d="M100 100 L${x1.toFixed(2)} ${y1.toFixed(2)} A${r} ${r} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z"
+            fill="${farbe}" stroke="rgba(0,0,0,.35)" stroke-width="0.5"/>
+      <text class="pocket-label" x="${tx.toFixed(2)}" y="${ty.toFixed(2)}"
+            transform="rotate(${drehung.toFixed(2)} ${tx.toFixed(2)} ${ty.toFixed(2)})">${zahl}</text>`;
+  }).join('');
+
+  return `<svg class="wheel-svg" viewBox="0 0 200 200" aria-hidden="true">
+    <circle cx="100" cy="100" r="99" fill="#1b1208"/>
+    ${sektoren}
+    <circle cx="100" cy="100" r="${r}" fill="none" stroke="#c9922c" stroke-width="3"/>
+    <circle cx="100" cy="100" r="58" fill="#12241b" stroke="rgba(232,182,76,.45)" stroke-width="2"/>
+  </svg>`;
+}
+
+const polar = (cx, cy, r, grad) => {
+  const bogen = (grad * Math.PI) / 180;
+  return [cx + r * Math.cos(bogen), cy + r * Math.sin(bogen)];
+};
+
+/**
+ * Das Rad. Sobald die Zahl feststeht, dreht der Kranz so weit, dass genau
+ * ihr Fach unter der Kugel oben zum Stehen kommt – die Animation zeigt also
+ * wirklich das Ergebnis und nicht irgendetwas.
+ *
+ * Möglich ist das, weil das Setzfenster beim Start der Drehung längst zu ist:
+ * Die Zahl früher zu kennen bringt niemandem einen Vorteil.
+ */
+function wheel(game, pocket) {
   const spinning = game.phase === 'spinning';
   const number = game.phase === 'result' ? game.number : null;
-  const dauer = `${game.spinMs ?? 5200}ms`;
+  const dauer = game.spinMs ?? 5200;
 
-  return el('div.wheel', { style: { '--spin-ms': dauer } }, [
-    el(`div.wheel-face${spinning ? '.wheel-face--spinning' : ''}`),
-    el(`div.wheel-ball${spinning ? '.wheel-ball--spinning' : ''}`, { 'aria-hidden': 'true' }, [
-      el('span.wheel-ball-dot'),
-    ]),
-    el('div.wheel-inner', {}, [
-      number === null
-        ? el('span.wheel-dots', { text: spinning ? '· · ·' : '–' })
-        : el(`span.wheel-number.wheel-number--${colorOf(number)}`, { text: String(number) }),
-    ]),
-  ]);
+  // Fünf volle Umdrehungen, dann das Zielfach nach oben unter die Kugel.
+  const ziel = pocket === null ? 0 : 360 * 5 - pocket * POCKET_ANGLE;
+
+  const kranz = el(`div.wheel-face${spinning ? '.wheel-face--spinning' : ''}`, {
+    html: wheelSvg(),
+  });
+  // Nach dem Dreh bleibt der Kranz auf dem Ergebnis stehen.
+  if (!spinning && pocket !== null) {
+    kranz.style.transform = `rotate(${(ziel % 360).toFixed(3)}deg)`;
+  }
+
+  return el(
+    'div.wheel',
+    { style: { '--spin-ms': `${dauer}ms`, '--spin-to': `${ziel.toFixed(3)}deg` } },
+    [
+      kranz,
+      el('div.wheel-marker', { 'aria-hidden': 'true' }),
+      el(`div.wheel-ball${spinning ? '.wheel-ball--spinning' : ''}`, { 'aria-hidden': 'true' }, [
+        el('span.wheel-ball-dot'),
+      ]),
+      el('div.wheel-inner', {}, [
+        number === null
+          ? el('span.wheel-dots', { text: spinning ? '· · ·' : '–' })
+          : el(`span.wheel-number.wheel-number--${colorOf(number)}`, { text: String(number) }),
+      ]),
+    ],
+  );
 }
 
 function history(game) {
@@ -378,9 +452,3 @@ function layout(ctx) {
 
 const betKey = (type, arg) => `${type}:${Array.isArray(arg) ? arg.join(',') : (arg ?? '')}`;
 
-/** Sinnvolle Chipwerte zwischen Mindest- und Höchsteinsatz. */
-function chipValues(min, max) {
-  const candidates = [min, 5, 10, 25, 50, 100, 250, 500];
-  const values = [...new Set(candidates.filter((value) => value >= min && value <= max))];
-  return values.length ? values.slice(0, 5) : [min];
-}

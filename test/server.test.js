@@ -46,7 +46,7 @@ test('Server: Eintritt liefert Guthaben und den Floor', async (t) => {
   assert.equal(floor.you.isHost, true, 'der erste Gast wird Host');
   assert.deepEqual(
     floor.floor.games.map((game) => game.id).sort(),
-    ['baccarat', 'blackjack', 'holdem', 'roulette', 'slots'],
+    ['baccarat', 'blackjack', 'holdem', 'plinko', 'roulette', 'slots'],
     'alle Spiele stehen auf dem Floor',
   );
   assert.deepEqual(floor.floor.tables, []);
@@ -529,10 +529,12 @@ test('Server: nach dem Verlassen kommt man mit demselben Namen zurück', async (
 });
 
 test('Server: wer mitten im Zug aufsteht, blockiert den Tisch nicht', async (t) => {
-  const { server, connect } = await setup(t, { botMs: 5 });
+  // Reichlich Chips im Verhältnis zu den Blinds: Sonst kann ein Bot schon in
+  // der ersten Hand pleitegehen, und dann fehlt für die nächste der Gegner.
+  const { server, connect } = await setup(t, { botMs: 5, startChips: 200_000 });
   const anna = await connect('Anna');
 
-  anna.send({ type: 'create_table', game: 'holdem', config: { smallBlind: 5, bigBlind: 10 } });
+  anna.send({ type: 'create_table', game: 'holdem', config: { smallBlind: 25, bigBlind: 50 } });
   const { code } = await anna.wait('table_created');
   anna.send({ type: 'sit', code, seat: 0 });
   await tableWhere(anna, (state) => state.youSeated);
@@ -587,13 +589,16 @@ test('Server: ein weggegangener Gast bekommt seinen Gewinn trotzdem gutgeschrieb
   const { server, connect } = await setup(t);
   const anna = await connect('Anna');
 
-  anna.send({ type: 'create_table', game: 'slots', config: { minBet: 10, maxBet: 10 } });
+  // Feste Grenzen, damit der Einsatz nicht auf den Tischmindestbetrag
+  // hochgezogen wird und die Rechnung unten aufgeht.
+  anna.send({ type: 'create_table', game: 'slots', config: { minBet: 50, maxBet: 50 } });
   const { code } = await anna.wait('table_created');
   anna.send({ type: 'sit', code });
   await tableWhere(anna, (state) => state.youSeated);
 
   const table = server.casino.table(code);
-  anna.send({ type: 'action', code, action: { move: 'spin', amount: 10 } });
+  const einsatz = table.config.minBet;
+  anna.send({ type: 'action', code, action: { move: 'spin', amount: einsatz } });
   await until(() => table.engine.spinning);
 
   // Mitten im Lauf der Walzen weggehen.
@@ -604,7 +609,7 @@ test('Server: ein weggegangener Gast bekommt seinen Gewinn trotzdem gutgeschrieb
   const gewinn = table.engine.lastResult.amount;
   assert.equal(
     server.casino.balanceOf(anna.playerId),
-    990 + gewinn,
+    1000 - einsatz + gewinn,
     'der Einsatz war weg, also muss auch der Gewinn kommen',
   );
 });

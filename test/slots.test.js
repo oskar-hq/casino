@@ -38,7 +38,15 @@ function makeTable(t, { balance = 1000, config = {}, seed = 7 } = {}) {
     code: 'SL01',
     module: slots,
     name: 'Automat',
-    config: slots.normalizeConfig({ ...slots.defaultConfig, spinMs: 10, ...config }),
+    config: slots.normalizeConfig({
+      ...slots.defaultConfig,
+      // Eigene Grenzen: Die Tests rechnen mit kleinen, gut lesbaren Beträgen
+      // und sollen nicht kaputtgehen, wenn die Tischtarife neu gesetzt werden.
+      minBet: 1,
+      maxBet: 1_000_000,
+      spinMs: 10,
+      ...config,
+    }),
     wallet,
     botMs: 5,
     rng: new Rng(seed),
